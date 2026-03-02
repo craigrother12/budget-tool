@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Rule of Thumb Budget Tool</title>
+  <meta name="description" content="MHE Budgetary Estimating Tool — Warehouse & Distribution" />
+  <meta name="theme-color" content="#0D0F14" />
+  <link rel="manifest" href="manifest.json" />
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+    body { background: #0D0F14; color: #DDD9D0; font-family: Georgia,'Times New Roman',serif; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #090B0F; }
+    ::-webkit-scrollbar-thumb { background: #1C2030; border-radius: 3px; }
+    #install-banner {
+      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+      background: linear-gradient(135deg,#1a1200,#0f0800);
+      border-bottom: 1px solid rgba(255,191,0,0.4);
+      padding: 10px 16px; align-items: center; justify-content: space-between; gap: 12px;
+      font-family: Georgia,serif;
+    }
+    #install-banner.show { display: flex; }
+    #install-banner .msg { font-size: 13px; color: #DDD9D0; flex: 1; }
+    #install-banner .msg span { color: #FFBF00; font-weight: bold; }
+    #install-btn { padding: 7px 16px; background: rgba(255,191,0,0.2); border: 1px solid rgba(255,191,0,0.6); border-radius: 4px; color: #FFBF00; font-size: 12px; letter-spacing: 0.08em; cursor: pointer; font-family: Georgia,serif; white-space: nowrap; }
+    #install-dismiss { background: transparent; border: none; color: #5A5850; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+  </style>
+</head>
+<body>
+
+<div id="install-banner">
+  <div class="msg">⬇ <span>Install Budget Tool</span> — add to Edge for offline use &amp; quick access from your taskbar</div>
+  <button id="install-btn">INSTALL APP</button>
+  <button id="install-dismiss">✕</button>
+</div>
+
+<div id="root"></div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+  let deferredPrompt = null;
+  const banner = document.getElementById('install-banner');
+  const installBtn = document.getElementById('install-btn');
+  const dismissBtn = document.getElementById('install-dismiss');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); deferredPrompt = e;
+    if (!window.matchMedia('(display-mode: standalone)').matches) banner.classList.add('show');
+  });
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null; banner.classList.remove('show');
+  });
+  dismissBtn.addEventListener('click', () => banner.classList.remove('show'));
+  window.addEventListener('appinstalled', () => { banner.classList.remove('show'); deferredPrompt = null; });
+</script>
+
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef } = React;
+
+const storage = (() => {
+  const DB_NAME = "BudgetToolDB", STORE = "kv", VERSION = 1;
+  let db = null;
+  const open = () => new Promise((res, rej) => {
+    if (db) return res(db);
+    const req = indexedDB.open(DB_NAME, VERSION);
+    req.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE, { keyPath: "key" });
+    req.onsuccess = (e) => { db = e.target.result; res(db); };
+    req.onerror = rej;
+  });
+  const tx = async (mode, fn) => { const d = await open(); return fn(d.transaction(STORE, mode).objectStore(STORE)); };
+  return {
+    async get(key) {
+      return new Promise(async (res, rej) => {
+        const store = await tx("readonly", s => s);
+        const req = store.get(key);
+        req.onsuccess = () => res(req.result ? { key, value: req.result.value } : null);
+        req.onerror = rej;
+      });
+    },
+    async set(key, value) {
+      return new Promise(async (res, rej) => {
+        const store = await tx("readwrite", s => s);
+        const req = store.put({ key, value });
+        req.onsuccess = () => res({ key, value });
+        req.onerror = rej;
+      });
+    },
+    async delete(key) {
+      return new Promise(async (res, rej) => {
+        const store = await tx("readwrite", s => s);
+        const req = store.delete(key);
+        req.onsuccess = () => res({ key, deleted: true });
+        req.onerror = rej;
+      });
+    },
+  };
+})();
+
+const CATALOG = [
+  { category: "Conveyor", icon: "⟶", color: "#FF6B35", items: [
+    { id:"c1",  name:"Non-Powered Roller (Gravity)",                 unit:"LF",  unitCost:74,      defaultQty:100, note:"" },
+    { id:"c2",  name:"Controlled Flow Gravity",                      unit:"LF",  unitCost:542,     defaultQty:100, note:"" },
+    { id:"c3",  name:"Belt on Roller/Slider Bed (level)",            unit:"LF",  unitCost:560,     defaultQty:100, note:"" },
+    { id:"c4",  name:"Belt on Roller/Slider Bed (incline/decline)",  unit:"LF",  unitCost:749,     defaultQty:100, note:"" },
+    { id:"c5",  name:"Live Roller Transportation (straight)",        unit:"LF",  unitCost:521,     defaultQty:100, note:"" },
+    { id:"c6",  name:"Zero-pressure Accumulation (photo sensor)",    unit:"LF",  unitCost:596,     defaultQty:100, note:"" },
+    { id:"c7",  name:"MDR Zero-pressure Accumulation (24/48 VDC)",  unit:"LF",  unitCost:753,     defaultQty:100, note:"" },
+    { id:"c8",  name:"MDR Zoned Belt Accumulation (24/48 VDC)",     unit:"LF",  unitCost:913,     defaultQty:100, note:"" },
+    { id:"c9",  name:"MDR Belted Incline/Decline (24/48 VDC)",      unit:"LF",  unitCost:1487,    defaultQty:50,  note:"" },
+    { id:"c10", name:"Recycling (MT Corrugate) Belt",                unit:"LF",  unitCost:617,     defaultQty:50,  note:"" },
+    { id:"c11", name:"Chain Driven Live Roller",                     unit:"LF",  unitCost:2520,    defaultQty:50,  note:"" },
+    { id:"c12", name:"2-Strand Dragline",                            unit:"LF",  unitCost:1940,    defaultQty:50,  note:"" },
+    { id:"c13", name:"Overhead Chain (encl track) Less Carriers",    unit:"LF",  unitCost:460,     defaultQty:100, note:"" },
+    { id:"c14", name:"Overhead Chain Carriers",                      unit:"EA",  unitCost:45,      defaultQty:50,  note:"Per carrier" },
+  ]},
+  { category: "Conveyor Accessories", icon: "⤷", color: "#FF9A3C", items: [
+    { id:"ca1",  name:"Gravity (curves/spurs)",                          unit:"EA", unitCost:1360,   defaultQty:4, note:"" },
+    { id:"ca2",  name:"Live Roller Transportation (MDR curves/spurs)",   unit:"EA", unitCost:6620,   defaultQty:4, note:"" },
+    { id:"ca3",  name:"Belt Curve",                                      unit:"EA", unitCost:15700,  defaultQty:4, note:"" },
+    { id:"ca4",  name:"Live Roller Merge Table (1-fixed deflector)",     unit:"EA", unitCost:11800,  defaultQty:2, note:"" },
+    { id:"ca5",  name:"Wide Belt Merge (per # of infeeds)",              unit:"EA", unitCost:18900,  defaultQty:2, note:"" },
+    { id:"ca6",  name:"Brake Belt",                                      unit:"EA", unitCost:10900,  defaultQty:2, note:"" },
+    { id:"ca7",  name:"Brake-Spacer Belt",                               unit:"EA", unitCost:16280,  defaultQty:2, note:"" },
+    { id:"ca8",  name:"Brake-Meter Belt",                                unit:"EA", unitCost:18010,  defaultQty:2, note:"" },
+    { id:"ca9",  name:"Air-operated Stop",                               unit:"EA", unitCost:3550,   defaultQty:4, note:"" },
+    { id:"ca10", name:"Gravity Personnel Gate",                          unit:"EA", unitCost:3470,   defaultQty:2, note:"" },
+    { id:"ca11", name:"MDR Powered Roller Personnel Gate",               unit:"EA", unitCost:9200,   defaultQty:2, note:"" },
+    { id:"ca12", name:"Belt Telescoping Loader/Unloader (53' trailer)",  unit:"EA", unitCost:118900, defaultQty:1, note:"" },
+    { id:"ca13", name:"Belt Fixed Boom Loader/Unloader (50' long)",      unit:"EA", unitCost:62400,  defaultQty:1, note:"" },
+    { id:"ca14", name:"Flexible Loader/Unloader",                        unit:"EA", unitCost:81500,  defaultQty:1, note:"" },
+    { id:"ca15", name:"Flexible Gravity Loader/Unloader (60'/26')",      unit:"EA", unitCost:6930,   defaultQty:1, note:"60' expanded / 26' compacted" },
+    { id:"ca16", name:"Spiral, powered, 1-level, 10'",                   unit:"EA", unitCost:101600, defaultQty:1, note:"" },
+    { id:"ca17", name:"Spiral, powered, 2-level, 20'",                   unit:"EA", unitCost:119600, defaultQty:1, note:"" },
+    { id:"ca18", name:"Spiral, powered, 3-level, 30'",                   unit:"EA", unitCost:134500, defaultQty:1, note:"" },
+    { id:"ca19", name:"Divert Spiral",                                   unit:"EA", unitCost:33500,  defaultQty:1, note:"" },
+    { id:"ca20", name:"Merge Spiral",                                    unit:"EA", unitCost:33500,  defaultQty:1, note:"" },
+    { id:"ca21", name:"Gravity Spiral (10')",                            unit:"EA", unitCost:49100,  defaultQty:1, note:"" },
+  ]},
+  { category: "Sortation Equipment", icon: "⑆", color: "#FFBF00", items: [
+    { id:"s1",  name:"Induction Belt",                                    unit:"EA", unitCost:36300,  defaultQty:1, note:"" },
+    { id:"s2",  name:"Line Scanner (single side)",                        unit:"EA", unitCost:10600,  defaultQty:2, note:"" },
+    { id:"s3",  name:"Omni Scanner (2-sided)",                            unit:"EA", unitCost:22100,  defaultQty:2, note:"" },
+    { id:"s4",  name:"Scanner Tunnel (5-sided)",                          unit:"EA", unitCost:95130,  defaultQty:1, note:"" },
+    { id:"s5",  name:"Periscope Scanner",                                 unit:"EA", unitCost:12500,  defaultQty:2, note:"" },
+    { id:"s6",  name:"Camera Scanner (single side)",                      unit:"EA", unitCost:10580,  defaultQty:2, note:"" },
+    { id:"s7",  name:"Camera Tunnel (5-sided)",                           unit:"EA", unitCost:95130,  defaultQty:1, note:"" },
+    { id:"s8",  name:"In-motion Scale (50 CPM or less, single stage)",    unit:"EA", unitCost:44800,  defaultQty:1, note:"" },
+    { id:"s9",  name:"Right Angle Transfer",                              unit:"EA", unitCost:14900,  defaultQty:4, note:"" },
+    { id:"s10", name:"Pick Zone Routing Transfer (single sided)",         unit:"EA", unitCost:21500,  defaultQty:4, note:"" },
+    { id:"s11", name:"Pick Zone Routing Transfer (double sided)",         unit:"EA", unitCost:62100,  defaultQty:2, note:"" },
+    { id:"s12", name:"Hi-speed Wheel Divert Per Divert w/Spur",          unit:"EA", unitCost:30600,  defaultQty:4, note:"" },
+    { id:"s13", name:"Narrow Belt Sorter (per LF, less diverts/spurs)",  unit:"LF", unitCost:1430,   defaultQty:60, note:"" },
+    { id:"s14", name:"Sliding Shoe Sorter (per divert, single sided)",   unit:"EA", unitCost:68700,  defaultQty:4, note:"" },
+    { id:"s15", name:"Sliding Shoe Sorter (per divert, double sided)",   unit:"EA", unitCost:110000, defaultQty:4, note:"" },
+  ]},
+  { category: "Storage Media", icon: "▦", color: "#2EC4B6", items: [
+    { id:"r1", name:"Mezzanine",                          unit:"SF",  unitCost:48,  defaultQty:5000, note:"" },
+    { id:"r2", name:"Pallet Rack — Selective Wide Aisle", unit:"PP",  unitCost:88,  defaultQty:500,  note:"" },
+    { id:"r3", name:"Pallet Rack — Selective VNA",        unit:"PP",  unitCost:88,  defaultQty:500,  note:"" },
+    { id:"r4", name:"Pallet Rack — Pushback",             unit:"PP",  unitCost:104, defaultQty:200,  note:"" },
+    { id:"r5", name:"Pallet Rack — Drive-in",             unit:"PP",  unitCost:86,  defaultQty:200,  note:"" },
+    { id:"r6", name:"Shelving",                           unit:"Bay", unitCost:225, defaultQty:50,   note:"" },
+    { id:"r7", name:"Pallet Flow",                        unit:"PP",  unitCost:331, defaultQty:100,  note:"" },
+  ]},
+  { category: "Picking & Packing Equipment", icon: "◻", color: "#F15BB5", items: [
+    { id:"p1", name:"Ergonomic Work Station",           unit:"EA", unitCost:1620,  defaultQty:6,   note:"" },
+    { id:"p2", name:"Label Printer for Workstation",    unit:"EA", unitCost:1780,  defaultQty:6,   note:"" },
+    { id:"p3", name:"Pick Cart",                        unit:"EA", unitCost:1170,  defaultQty:10,  note:"" },
+    { id:"p4", name:"Fatigue Mats",                     unit:"EA", unitCost:150,   defaultQty:10,  note:"" },
+    { id:"p5", name:"Static Scale with Ball Top",       unit:"EA", unitCost:7220,  defaultQty:2,   note:"" },
+    { id:"p6", name:"Manifesting Station (w/o scale)",  unit:"EA", unitCost:2770,  defaultQty:4,   note:"" },
+    { id:"p7", name:"Highway Guard Rail",               unit:"LF", unitCost:120,   defaultQty:100, note:"" },
+    { id:"p8", name:"Semi-Auto Carton Taper",           unit:"EA", unitCost:21200, defaultQty:2,   note:"" },
+    { id:"p9", name:"Dunnage/Void Fill Dispenser",      unit:"EA", unitCost:3430,  defaultQty:2,   note:"" },
+  ]},
+  { category: "Other Technologies & Support Equipment", icon: "◈", color: "#FF4D6D", items: [
+    { id:"t1",  name:"Pick/Put to Light (light hardware only)",        unit:"EA", unitCost:22050,   defaultQty:1,  note:"" },
+    { id:"t2",  name:"Voice Pick Hardware",                            unit:"EA", unitCost:165,     defaultQty:10, note:"" },
+    { id:"t3",  name:"RF Hand Held Scanners",                          unit:"EA", unitCost:3780,    defaultQty:10, note:"" },
+    { id:"t4",  name:"Autonomous Mobile Robot (AMR) P-2-P Transport", unit:"EA", unitCost:80000,   defaultQty:5,  note:"" },
+    { id:"t5",  name:"Pick Assist AMR (Leased)",                       unit:"MO", unitCost:1400,    defaultQty:12, note:"Per robot per month" },
+    { id:"t6",  name:"Robotic Arm with End Effector for Unit Pick",   unit:"EA", unitCost:700000,  defaultQty:1,  note:"" },
+    { id:"t7",  name:"Unit Load (Pallet ASRS) System per Aisle",      unit:"EA", unitCost:2300000, defaultQty:1,  note:"" },
+    { id:"t8",  name:"Mini Load (Tote/Bin ASRS) System per Aisle",    unit:"EA", unitCost:2300000, defaultQty:1,  note:"" },
+    { id:"t9",  name:"Pallet Stretch Wrapper — Semi-Automated",       unit:"EA", unitCost:43300,   defaultQty:1,  note:"" },
+    { id:"t10", name:"Pallet Stretch Wrapper — Automated",            unit:"EA", unitCost:224700,  defaultQty:1,  note:"" },
+    { id:"t11", name:"Print/Apply (1 Print Head, no software)",       unit:"EA", unitCost:42500,   defaultQty:2,  note:"" },
+    { id:"t12", name:"Totes",                                          unit:"EA", unitCost:18,      defaultQty:500,note:"" },
+  ]},
+  { category: "Pick Module", icon: "⊞", color: "#9B5DE5", items: [
+    { id:"pm1",  name:"Static Pallet",                      unit:"PP",  unitCost:294,    defaultQty:100,  note:"" },
+    { id:"pm2",  name:"Decked Surface",                     unit:"SF",  unitCost:47,     defaultQty:2000, note:"" },
+    { id:"pm3",  name:"Shelving (Floor + 1 Level)",         unit:"Bay", unitCost:1380,   defaultQty:20,   note:"" },
+    { id:"pm4",  name:"Flow Rack",                          unit:"LVL", unitCost:1610,   defaultQty:10,   note:"Per level" },
+    { id:"pm5",  name:"Pallet Flow",                        unit:"PP",  unitCost:620,    defaultQty:50,   note:"" },
+    { id:"pm6",  name:"Vertical Lift Pallet",               unit:"EA",  unitCost:134100, defaultQty:1,    note:"" },
+    { id:"pm7",  name:"Lighting — LED with motion sensors", unit:"SF",  unitCost:15,     defaultQty:5000, note:"" },
+    { id:"pm8",  name:"Sprinklers",                         unit:"SF",  unitCost:55,     defaultQty:5000, note:"" },
+    { id:"pm9",  name:"Stair Tower 2-level",                unit:"EA",  unitCost:15300,  defaultQty:2,    note:"" },
+    { id:"pm10", name:"Stair Tower 3-level",                unit:"EA",  unitCost:22800,  defaultQty:1,    note:"" },
+  ]},
+];
+
+const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
+const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
+const BG="#0D0F14",BGDEEP="#090B0F",BGCARD="#0F1218",BGROW="#141820",BORDER="#1C2030",BORDER2="#252830",TEXT="#DDD9D0",TEXTDIM="#AAA69E",MUTE="#5A5850",FADE="#4A4E5A",ACCENT="#FF6B35",GOLD="#FFBF00";
+
+function App() {
+  const containerRef = useRef(null);
+  const [width, setWidth] = useState(900);
+  const [mobileTab, setMobileTab] = useState("catalog");
+  const [selected, setSelected] = useState({});
+  const [expanded, setExpanded] = useState({"Conveyor":true});
+  const [contingency, setContingency] = useState(15);
+  const [freightPct, setFreightPct] = useState(5);
+  const [marginPct, setMarginPct] = useState(30);
+  const [softwareBudget, setSoftwareBudget] = useState(0);
+  const [softwareRaw, setSoftwareRaw] = useState("");
+  const [projName, setProjName] = useState("New Project");
+  const [editingName, setEditingName] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveCustomer, setSaveCustomer] = useState("");
+  const [saveUser, setSaveUser] = useState("");
+  const [savedQuotes, setSavedQuotes] = useState([]);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el); setWidth(el.offsetWidth); return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try { const r = await storage.get("savedQuotes"); if (r?.value) setSavedQuotes(JSON.parse(r.value)); } catch(e) {}
+    })();
+  }, []);
+
+  const mobile = width < 680;
+
+  const toggleItem = (item) => setSelected(p => {
+    if (p[item.id]) { const n={...p}; delete n[item.id]; return n; }
+    return {...p, [item.id]:{qty:item.defaultQty, raw:String(item.defaultQty)}};
+  });
+  const handleQtyChange = (id, raw) => setSelected(p => ({...p,[id]:{...p[id],raw}}));
+  const commitQty = (id) => setSelected(p => {
+    const raw=p[id]?.raw??""; const n=parseFloat(raw);
+    const qty=(!isNaN(n)&&n>=0)?n:(p[id]?.qty??0);
+    return {...p,[id]:{...p[id],qty,raw:String(qty)}};
+  });
+
+  const lines = useMemo(() => {
+    const res=[];
+    CATALOG.forEach(cat=>cat.items.forEach(item=>{
+      if(!selected[item.id])return;
+      const qty=selected[item.id].qty;
+      res.push({...item,qty,subtotal:item.unit==="%"?null:qty*item.unitCost,catColor:cat.color,category:cat.category});
+    }));
+    const eq=res.filter(i=>i.unit!=="%").reduce((s,i)=>s+i.subtotal,0);
+    res.forEach(i=>{if(i.unit==="%")i.subtotal=(i.qty/100)*eq;});
+    return res;
+  },[selected]);
+
+  const equipTotal=lines.reduce((s,i)=>s+i.subtotal,0);
+  const subWithSW=equipTotal+softwareBudget;
+  const freightAmt=subWithSW*(freightPct/100);
+  const contAmt=(subWithSW+freightAmt)*(contingency/100);
+  const grand=subWithSW+freightAmt+contAmt;
+  const marginAmt=grand*(marginPct/100);
+  const costBasis=grand-marginAmt;
+  const selCount=Object.keys(selected).length;
+
+  const doSaveQuote = async () => {
+    const quote={
+      id:Date.now(),
+      date:new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}),
+      projectName:projName, customer:saveCustomer, user:saveUser,
+      lines:lines.map(l=>({id:l.id,name:l.name,category:l.category,unit:l.unit,unitCost:l.unitCost,qty:l.qty,subtotal:l.subtotal})),
+      equipTotal,softwareBudget,subWithSW,freightAmt,freightPct,contAmt,contingency,grand,marginAmt,marginPct,costBasis,
+    };
+    const updated=[quote,...savedQuotes];
+    setSavedQuotes(updated);
+    try { await storage.set("savedQuotes",JSON.stringify(updated)); } catch(e) {}
+    setShowSaveModal(false); setSaveSuccess(true); setTimeout(()=>setSaveSuccess(false),3000);
+  };
+
+  const deleteQuote = async (id) => {
+    const updated=savedQuotes.filter(q=>q.id!==id);
+    setSavedQuotes(updated);
+    try { await storage.set("savedQuotes",JSON.stringify(updated)); } catch(e) {}
+  };
+
+  const downloadExcel = (quote) => {
+    const XLSX=window.XLSX; if(!XLSX){alert("Excel library not loaded yet — try again in a moment.");return;}
+    const wb=XLSX.utils.book_new();
+    const summaryData=[
+      ["RULE OF THUMB BUDGET TOOL"],["Budgetary Estimate — For Planning Purposes Only"],[],
+      ["Project",quote.projectName],["Customer",quote.customer],["Prepared By",quote.user],["Date",quote.date],[],
+      ["CATEGORY","ITEM","UNIT","UNIT PRICE","QTY","SUBTOTAL"],
+    ];
+    const byCategory={};
+    quote.lines.forEach(l=>{if(!byCategory[l.category])byCategory[l.category]=[];byCategory[l.category].push(l);});
+    Object.entries(byCategory).forEach(([cat,items])=>{
+      const catTotal=items.reduce((s,i)=>s+i.subtotal,0);
+      items.forEach((l,idx)=>summaryData.push([idx===0?cat:"",l.name,l.unit,l.unitCost,l.qty,l.subtotal]));
+      summaryData.push(["",`${cat} Subtotal`,"","","",catTotal]);
+      summaryData.push([]);
+    });
+    summaryData.push(["BUDGET SUMMARY"]);
+    summaryData.push(["Turnkey Subtotal","","","","",quote.equipTotal]);
+    if(quote.softwareBudget>0){summaryData.push(["Software Budget","","","","",quote.softwareBudget]);summaryData.push(["Combined Subtotal","","","","",quote.subWithSW]);}
+    summaryData.push([`Freight & Rigging (${quote.freightPct}%)`,"","","","",quote.freightAmt]);
+    summaryData.push([`Contingency (${quote.contingency}%)`,"","","","",quote.contAmt]);
+    summaryData.push(["TOTAL TURNKEY ESTIMATE","","","","",quote.grand]);
+    summaryData.push([]);
+    summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`,"","","","",quote.marginAmt]);
+    summaryData.push(["Cost Basis","","","","",quote.costBasis]);
+    summaryData.push([]);
+    summaryData.push(["DISCLAIMER: All prices are turnkey budgetary estimates ±25%. For planning purposes only — not a formal quotation."]);
+    const ws=XLSX.utils.aoa_to_sheet(summaryData);
+    ws["!cols"]=[{wch:32},{wch:48},{wch:8},{wch:14},{wch:8},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws,"Quote");
+    const indexData=[["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
+    const ws2=XLSX.utils.aoa_to_sheet(indexData);
+    ws2["!cols"]=[{wch:14},{wch:26},{wch:24},{wch:20},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws2,"Saved Quotes");
+    XLSX.writeFile(wb,`${quote.projectName.replace(/[^a-zA-Z0-9_-]/g,"_")}_${quote.date.replace(/\s/g,"_")}.xlsx`);
+  };
+
+  const nameEditor = (small) => editingName ? (
+    <input autoFocus value={projName} onChange={e=>setProjName(e.target.value)} onBlur={()=>setEditingName(false)} onKeyDown={e=>e.key==="Enter"&&setEditingName(false)}
+      style={{background:"transparent",border:"none",borderBottom:`1px solid ${ACCENT}`,color:TEXT,fontSize:small?"13px":"14px",fontFamily:"Georgia,serif",padding:"2px 4px",width:small?"100%":"180px"}} />
+  ) : (
+    <span onClick={()=>setEditingName(true)} style={{fontSize:small?"13px":"14px",color:small?TEXTDIM:TEXT,cursor:"text",borderBottom:`1px dashed ${BORDER}`}}>{projName}</span>
+  );
+
+  const catalogPanel = (
+    <div style={{flex:1,overflowY:"auto",background:BG,minHeight:0}}>
+      <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
+        <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>EQUIPMENT & SERVICES CATALOG</div>
+        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Tap to add · set quantity inline</div>
+      </div>
+      {CATALOG.map(cat=>{
+        const addedN=cat.items.filter(i=>selected[i.id]).length;
+        const open=!!expanded[cat.category];
+        return (
+          <div key={cat.category} style={{borderBottom:`1px solid ${BORDER}`}}>
+            <div onClick={e=>{e.preventDefault();setExpanded(p=>({...p,[cat.category]:!p[cat.category]}));}}
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",background:open?"#101420":"transparent"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"8px",minWidth:0}}>
+                <span style={{color:cat.color,fontSize:"14px",flexShrink:0}}>{cat.icon}</span>
+                <span style={{fontSize:"12px",fontWeight:"bold",letterSpacing:"0.04em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cat.category.toUpperCase()}</span>
+                {addedN>0&&<span style={{background:cat.color+"25",border:`1px solid ${cat.color}50`,borderRadius:"10px",padding:"1px 7px",fontSize:"10px",color:cat.color,flexShrink:0}}>{addedN}</span>}
+              </div>
+              <span style={{color:FADE,fontSize:"10px",flexShrink:0,marginLeft:"6px"}}>{open?"▲":"▼"}</span>
+            </div>
+            {open&&cat.items.map(item=>{
+              const sel=!!selected[item.id];
+              return (
+                <div key={item.id} style={{padding:"9px 14px 9px 28px",background:sel?cat.color+"0D":"transparent",borderLeft:sel?`3px solid ${cat.color}`:"3px solid transparent",borderBottom:`1px solid ${BGROW}`}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:"10px",cursor:"pointer"}} onClick={()=>toggleItem(item)}>
+                    <div style={{width:"22px",height:"22px",borderRadius:"50%",flexShrink:0,marginTop:"1px",background:sel?cat.color:BORDER,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",color:sel?BGDEEP:MUTE}}>
+                      {sel?"✓":"+"}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:"13px",color:sel?TEXT:TEXTDIM,lineHeight:1.3}}>{item.name}</div>
+                      <div style={{fontSize:"11px",color:sel?cat.color:FADE,marginTop:"2px"}}>
+                        {item.unit==="%"?`${item.defaultQty}% of equip`:`${fmt(item.unitCost)} / ${item.unit}`}
+                        {item.note?` · ${item.note}`:""}
+                      </div>
+                    </div>
+                  </div>
+                  {sel&&(
+                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"8px",paddingLeft:"32px"}} onClick={e=>e.stopPropagation()}>
+                      <span style={{fontSize:"11px",color:MUTE}}>QTY</span>
+                      <input value={selected[item.id]?.raw??""} onChange={e=>handleQtyChange(item.id,e.target.value)} onBlur={()=>commitQty(item.id)} onClick={e=>e.stopPropagation()} inputMode="decimal"
+                        style={{width:"72px",textAlign:"right",background:BGROW,border:`1px solid ${cat.color}60`,borderRadius:"3px",padding:"5px 8px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+                      <span style={{fontSize:"11px",color:MUTE}}>{item.unit}</span>
+                      <span style={{fontSize:"12px",color:cat.color,fontStyle:"italic",marginLeft:"auto"}}>{fmtFull((selected[item.id]?.qty??0)*item.unitCost)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const budgetPanel = (
+    <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
+      {selCount===0?(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"280px",gap:"12px",color:FADE,padding:"32px 20px",textAlign:"center"}}>
+          <div style={{fontSize:"36px"}}>◻</div>
+          <div style={{fontSize:"15px",fontStyle:"italic",color:MUTE}}>No items added yet</div>
+          <div style={{fontSize:"13px"}}>Browse the catalog and tap items to build your budget</div>
+        </div>
+      ):(
+        <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
+          <div style={{marginBottom:"16px"}}>
+            <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGETARY ESTIMATE</div>
+            <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
+            <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>All pricing ±25% budgetary</div>
+          </div>
+          {CATALOG.map(cat=>{
+            const catLines=lines.filter(l=>l.category===cat.category);
+            if(!catLines.length)return null;
+            const catTotal=catLines.reduce((s,l)=>s+l.subtotal,0);
+            return (
+              <div key={cat.category} style={{marginBottom:"18px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:cat.color+"12",borderLeft:`3px solid ${cat.color}`,borderRadius:"0 4px 4px 0",marginBottom:"2px"}}>
+                  <span style={{fontSize:"11px",letterSpacing:"0.1em",color:cat.color}}>{cat.icon} {cat.category.toUpperCase()}</span>
+                  <span style={{fontSize:"13px",color:cat.color,fontStyle:"italic"}}>{fmtFull(catTotal)}</span>
+                </div>
+                {catLines.map(line=>(
+                  <div key={line.id} style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:"13px",color:TEXT,lineHeight:1.3}}>{line.name}</div>
+                        {line.note&&<div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>{line.note}</div>}
+                      </div>
+                      <button onClick={()=>toggleItem(line)} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",width:"24px",height:"24px",flexShrink:0,cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"7px",gap:"6px"}}>
+                      <span style={{fontSize:"11px",color:MUTE,flex:1}}>{line.unit==="%"?"% of equip":`${fmt(line.unitCost)} / ${line.unit}`}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
+                        <span style={{fontSize:"10px",color:FADE}}>QTY</span>
+                        <input value={selected[line.id]?.raw??""} onChange={e=>handleQtyChange(line.id,e.target.value)} onBlur={()=>commitQty(line.id)} inputMode="decimal"
+                          style={{width:"58px",textAlign:"right",background:BGROW,border:`1px solid ${BORDER2}`,borderRadius:"3px",padding:"4px 6px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+                      </div>
+                      <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic",minWidth:"74px",textAlign:"right"}}>{fmtFull(line.subtotal)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          <div style={{marginTop:"20px",background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
+            <div style={{padding:"10px 14px",borderBottom:`1px solid ${BORDER}`}}>
+              <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGET SUMMARY</div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
+              <div>
+                <span style={{fontSize:"13px",color:"#8A8880"}}>Turnkey Subtotal</span>
+                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Equip + install + commissioning + eng + margin</div>
+              </div>
+              <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT}}>{fmtFull(equipTotal)}</span>
+            </div>
+            <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(155,93,229,0.04)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <div>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Software Budget</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS — enter client-supplied or estimated budget</div>
+                </div>
+                {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareBudget)}</span>}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                <span style={{fontSize:"11px",color:MUTE}}>$</span>
+                <input value={softwareRaw} onChange={e=>setSoftwareRaw(e.target.value)}
+                  onBlur={()=>{const n=parseFloat(softwareRaw.replace(/,/g,""));const val=(!isNaN(n)&&n>=0)?n:0;setSoftwareBudget(val);setSoftwareRaw(val>0?val.toLocaleString():"");}}
+                  placeholder="0" inputMode="decimal"
+                  style={{flex:1,background:BGROW,border:"1px solid #9B5DE560",borderRadius:"3px",padding:"6px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+                {softwareBudget>0&&<button onClick={()=>{setSoftwareBudget(0);setSoftwareRaw("");}} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"5px 8px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Clear</button>}
+              </div>
+            </div>
+            <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <div>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Freight & Rigging</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>% of turnkey subtotal</div>
+                </div>
+                <span style={{fontSize:"14px",color:"#00BBF9"}}>{fmtFull(freightAmt)}</span>
+              </div>
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {[3,4,5,6,8].map(p=>(
+                  <button key={p} onClick={()=>setFreightPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"12px",background:freightPct===p?"rgba(0,187,249,0.15)":"transparent",border:freightPct===p?"1px solid rgba(0,187,249,0.5)":`1px solid ${BORDER}`,color:freightPct===p?"#00BBF9":FADE}}>{p}%</button>
+                ))}
+              </div>
+              <div style={{fontSize:"10px",color:FADE,marginTop:"6px"}}>3–4% light/small · 5–6% typical MHE · 8% heavy/robotic</div>
+            </div>
+            <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <div>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Contingency</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Applied to turnkey + freight</div>
+                </div>
+                <span style={{fontSize:"14px",color:GOLD}}>{fmtFull(contAmt)}</span>
+              </div>
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {[1,3,5,10,15,20,25].map(p=>(
+                  <button key={p} onClick={()=>setContingency(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:contingency===p?"rgba(255,107,53,0.2)":"transparent",border:contingency===p?"1px solid rgba(255,107,53,0.5)":`1px solid ${BORDER}`,color:contingency===p?ACCENT:FADE}}>{p}%</button>
+                ))}
+              </div>
+            </div>
+            <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(46,196,182,0.04)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <div>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Estimated Margin</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Cost basis: {fmtFull(costBasis)} · GP on sell price</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:"14px",color:"#2EC4B6"}}>{fmtFull(marginAmt)}</div>
+                  <div style={{fontSize:"10px",color:MUTE}}>{marginPct}% GP</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {[20,23,25,30,35,40].map(p=>(
+                  <button key={p} onClick={()=>setMarginPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:marginPct===p?"rgba(46,196,182,0.2)":"transparent",border:marginPct===p?"1px solid rgba(46,196,182,0.5)":`1px solid ${BORDER}`,color:marginPct===p?"#2EC4B6":FADE}}>{p}%</button>
+                ))}
+              </div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"15px 14px",background:"linear-gradient(135deg,rgba(255,107,53,0.08),rgba(255,191,0,0.05))"}}>
+              <div>
+                <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE}}>TOTAL TURNKEY ESTIMATE</div>
+                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>±25% budgetary · includes freight & contingency</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:mobile?"22px":"26px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</div>
+                <div style={{fontSize:"11px",color:MUTE}}>{selCount} line items</div>
+              </div>
+            </div>
+          </div>
+          <div style={{marginTop:"16px",display:"flex",gap:"10px"}}>
+            <button onClick={()=>setShowSaveModal(true)}
+              style={{flex:1,padding:"12px",background:"rgba(255,107,53,0.15)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+              💾 SAVE QUOTE
+            </button>
+          </div>
+          {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ Quote saved successfully</div>}
+          <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
+            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All prices are turnkey budgetary estimates including equipment, installation labor, commissioning, engineering, and integrator margin. Freight is estimated separately. Total carries a ±25% variance. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const savedPanel = (
+    <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
+      <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
+        <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>SAVED QUOTES</div>
+        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>{savedQuotes.length} saved · click to download Excel</div>
+      </div>
+      {savedQuotes.length===0?(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"200px",gap:"10px",color:FADE,padding:"32px 20px",textAlign:"center"}}>
+          <div style={{fontSize:"30px"}}>📋</div>
+          <div style={{fontSize:"14px",fontStyle:"italic",color:MUTE}}>No saved quotes yet</div>
+          <div style={{fontSize:"12px"}}>Build a budget and click Save Quote</div>
+        </div>
+      ):savedQuotes.map(q=>(
+        <div key={q.id} style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,background:BGCARD}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic"}}>{q.projectName}</div>
+              <div style={{fontSize:"11px",color:TEXTDIM,marginTop:"3px"}}>{q.customer} · {q.user}</div>
+              <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>{q.date}</div>
+            </div>
+            <div style={{textAlign:"right",flexShrink:0}}>
+              <div style={{fontSize:"16px",color:ACCENT,fontStyle:"italic",fontWeight:"bold"}}>{fmtFull(q.grand)}</div>
+              <div style={{fontSize:"10px",color:MUTE,marginTop:"2px"}}>{q.lines.length} items</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
+            <button onClick={()=>downloadExcel(q)}
+              style={{flex:1,padding:"7px 10px",background:"rgba(46,196,182,0.1)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
+              ⬇ DOWNLOAD EXCEL
+            </button>
+            <button onClick={()=>deleteQuote(q.id)}
+              style={{padding:"7px 10px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"4px",color:FADE,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const saveModal = showSaveModal && (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
+      <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"400px",overflow:"hidden"}}>
+        <div style={{padding:"16px 20px",borderBottom:`1px solid ${BORDER}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:"13px",letterSpacing:"0.1em",color:MUTE}}>SAVE QUOTE</div>
+          <button onClick={()=>setShowSaveModal(false)} style={{background:"transparent",border:"none",color:FADE,fontSize:"16px",cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{padding:"20px"}}>
+          {[{label:"Project Name",value:projName,setter:setProjName},{label:"Customer Name",value:saveCustomer,setter:setSaveCustomer},{label:"Prepared By",value:saveUser,setter:setSaveUser}].map(({label,value,setter})=>(
+            <div key={label} style={{marginBottom:"14px"}}>
+              <div style={{fontSize:"10px",letterSpacing:"0.14em",color:MUTE,marginBottom:"5px"}}>{label.toUpperCase()}</div>
+              <input value={value} onChange={e=>setter(e.target.value)}
+                style={{width:"100%",background:BGROW,border:`1px solid ${BORDER}`,borderRadius:"4px",padding:"9px 12px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none",boxSizing:"border-box"}} />
+            </div>
+          ))}
+          <div style={{padding:"10px 12px",background:"rgba(255,107,53,0.06)",border:`1px solid ${BORDER}`,borderRadius:"4px",marginBottom:"16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",color:TEXTDIM}}>
+              <span>Total Estimate</span>
+              <span style={{color:ACCENT,fontStyle:"italic",fontWeight:"bold"}}>{fmtFull(grand)}</span>
+            </div>
+            <div style={{fontSize:"10px",color:FADE,marginTop:"3px"}}>{selCount} line items · {new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"})}</div>
+          </div>
+          <button onClick={doSaveQuote}
+            style={{width:"100%",padding:"12px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.6)",borderRadius:"5px",color:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+            SAVE QUOTE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div ref={containerRef} style={{height:"100vh",display:"flex",flexDirection:"column",background:BG,fontFamily:"Georgia,'Times New Roman',serif",color:TEXT,overflow:"hidden"}}>
+      {saveModal}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:"50px",borderBottom:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0,gap:"10px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:"9px",flexShrink:0}}>
+          <div style={{width:"20px",height:"20px",background:"linear-gradient(135deg,#FF6B35,#FFBF00)",clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)"}} />
+          <span style={{fontSize:mobile?"13px":"15px",letterSpacing:"0.06em",fontWeight:"bold",whiteSpace:"nowrap"}}>
+            RULE OF THUMB <span style={{color:ACCENT,fontStyle:"italic"}}>BUDGET TOOL</span>
+          </span>
+        </div>
+        {!mobile&&(
+          <div style={{display:"flex",alignItems:"center",gap:"6px",flex:1,justifyContent:"center"}}>
+            {nameEditor(false)}
+            <span style={{fontSize:"10px",color:MUTE}}>✎</span>
+          </div>
+        )}
+        <div style={{display:"flex",alignItems:"center",gap:"5px",background:"rgba(255,107,53,0.1)",border:"1px solid rgba(255,107,53,0.3)",borderRadius:"20px",padding:"4px 10px",flexShrink:0}}>
+          <span style={{fontSize:"10px",color:"#8A8880"}}>TOTAL</span>
+          <span style={{fontSize:"14px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</span>
+        </div>
+      </div>
+      {mobile?(
+        <>
+          <div style={{display:"flex",alignItems:"center",gap:"6px",padding:"7px 14px",borderBottom:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0}}>
+            {nameEditor(true)}
+            <span style={{fontSize:"10px",color:FADE}}>✎</span>
+          </div>
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
+            {mobileTab==="catalog"?catalogPanel:mobileTab==="budget"?budgetPanel:savedPanel}
+          </div>
+          <div style={{display:"flex",borderTop:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0}}>
+            {[{key:"catalog",label:"⊕ CATALOG"},{key:"budget",label:`◎ BUDGET${selCount>0?` (${selCount})`:""}`},{key:"saved",label:`📋 SAVED${savedQuotes.length>0?` (${savedQuotes.length})`:""}`}].map(tab=>(
+              <button key={tab.key} onClick={()=>setMobileTab(tab.key)}
+                style={{flex:1,padding:"13px 4px",background:mobileTab===tab.key?"rgba(255,107,53,0.1)":"transparent",border:"none",borderTop:mobileTab===tab.key?`2px solid ${ACCENT}`:"2px solid transparent",color:mobileTab===tab.key?ACCENT:MUTE,fontSize:"11px",letterSpacing:"0.06em",cursor:"pointer",fontFamily:"Georgia,serif"}}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ):(
+        <div style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
+          <div style={{width:"380px",flexShrink:0,borderRight:`1px solid ${BORDER}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            {catalogPanel}
+          </div>
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",borderRight:`1px solid ${BORDER}`}}>
+            {budgetPanel}
+          </div>
+          <div style={{width:"320px",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            {savedPanel}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "Rule of Thumb Budget Tool",
+  "short_name": "Budget Tool",
+  "description": "MHE Budgetary Estimating Tool — Warehouse & Distribution",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0D0F14",
+  "theme_color": "#0D0F14",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/FF6B35/FFFFFF?text=ROT",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512/FF6B35/FFFFFF?text=ROT",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
