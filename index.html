@@ -203,6 +203,10 @@ const CATALOG = [
   ]},
 ];
 
+// ── Baked-in rate assumptions ─────────────────────────────────────────────
+const BASE_MARGIN_PCT   = 21;  // already baked into catalog unit prices
+const BASE_CONT_PCT     = 3;   // already baked into catalog unit prices
+
 const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
 const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
 const BG="#0D0F14",BGDEEP="#090B0F",BGCARD="#0F1218",BGROW="#141820",BORDER="#1C2030",BORDER2="#252830",TEXT="#DDD9D0",TEXTDIM="#AAA69E",MUTE="#5A5850",FADE="#4A4E5A",ACCENT="#FF6B35",GOLD="#FFBF00";
@@ -217,20 +221,21 @@ function App() {
   const [mobileTab, setMobileTab] = useState("catalog");
   const [lines, setLines] = useState([]);
   const [expanded, setExpanded] = useState({"Conveyor":true});
-  const [contingency, setContingency] = useState(15);
-  const [freightPct, setFreightPct] = useState(5);
-  const [marginPct, setMarginPct] = useState(30);
+  // Additional margin/contingency ON TOP of what's already baked in
+  const [contingency, setContingency]   = useState(0);
+  const [freightPct, setFreightPct]     = useState(5);
+  const [marginPct, setMarginPct]       = useState(0);
   const [softwareBudget, setSoftwareBudget] = useState(0);
-  const [softwareRaw, setSoftwareRaw] = useState("");
-  const [projName, setProjName] = useState("New Project");
-  const [editingName, setEditingName] = useState(false);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveCustomer, setSaveCustomer] = useState("");
-  const [saveUser, setSaveUser] = useState("");
-  const [savedQuotes, setSavedQuotes] = useState([]);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [editingQuoteId, setEditingQuoteId] = useState(null); // tracks which saved quote is being edited
-  const [showLoadConfirm, setShowLoadConfirm] = useState(null); // quote to confirm loading
+  const [softwareRaw, setSoftwareRaw]   = useState("");
+  const [projName, setProjName]         = useState("New Project");
+  const [editingName, setEditingName]   = useState(false);
+  const [showSaveModal, setShowSaveModal]   = useState(false);
+  const [saveCustomer, setSaveCustomer]     = useState("");
+  const [saveUser, setSaveUser]             = useState("");
+  const [savedQuotes, setSavedQuotes]       = useState([]);
+  const [saveSuccess, setSaveSuccess]       = useState(false);
+  const [editingQuoteId, setEditingQuoteId] = useState(null);
+  const [showLoadConfirm, setShowLoadConfirm] = useState(null);
   const instanceCounter = useRef(0);
 
   useEffect(() => {
@@ -252,100 +257,87 @@ function App() {
     setLines(prev => [...prev, { instanceId:`${item.id}_${instanceCounter.current}`, itemId:item.id, qty:item.defaultQty, raw:String(item.defaultQty), label:"" }]);
   };
 
-  const removeInstance = (instanceId) => setLines(prev => prev.filter(l => l.instanceId !== instanceId));
-  const updateQtyRaw = (instanceId, raw) => setLines(prev => prev.map(l => l.instanceId===instanceId ? {...l,raw} : l));
-  const commitQty = (instanceId) => setLines(prev => prev.map(l => {
+  const removeInstance  = (instanceId) => setLines(prev => prev.filter(l => l.instanceId!==instanceId));
+  const updateQtyRaw    = (instanceId, raw) => setLines(prev => prev.map(l => l.instanceId===instanceId?{...l,raw}:l));
+  const commitQty       = (instanceId) => setLines(prev => prev.map(l => {
     if (l.instanceId!==instanceId) return l;
     const n=parseFloat(l.raw); const qty=(!isNaN(n)&&n>=0)?n:l.qty;
     return {...l,qty,raw:String(qty)};
   }));
-  const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId===instanceId ? {...l,label} : l));
+  const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId===instanceId?{...l,label}:l));
 
-  // ── Load a saved quote into the builder ───────────────────────────────────
   const loadQuote = (quote) => {
     instanceCounter.current += 1000;
     const base = instanceCounter.current;
-    const restoredLines = quote.lines
-      .filter(l => ITEM_MAP[l.itemId])
-      .map((l, i) => ({
-        instanceId: `${l.itemId}_${base + i}`,
-        itemId: l.itemId,
-        qty: l.qty,
-        raw: String(l.qty),
-        label: l.label || "",
-      }));
-    setLines(restoredLines);
+    setLines(quote.lines.filter(l=>ITEM_MAP[l.itemId]).map((l,i)=>({
+      instanceId:`${l.itemId}_${base+i}`, itemId:l.itemId, qty:l.qty, raw:String(l.qty), label:l.label||"",
+    })));
     setProjName(quote.projectName);
     setSaveCustomer(quote.customer);
     setSaveUser(quote.user);
-    setFreightPct(quote.freightPct || 5);
-    setContingency(quote.contingency || 15);
-    setMarginPct(quote.marginPct || 30);
-    setSoftwareBudget(quote.softwareBudget || 0);
-    setSoftwareRaw(quote.softwareBudget > 0 ? quote.softwareBudget.toLocaleString() : "");
+    setFreightPct(quote.freightPct||5);
+    setContingency(quote.contingency||0);
+    setMarginPct(quote.marginPct||0);
+    setSoftwareBudget(quote.softwareBudget||0);
+    setSoftwareRaw(quote.softwareBudget>0?quote.softwareBudget.toLocaleString():"");
     setEditingQuoteId(quote.id);
     setShowLoadConfirm(null);
     setMobileTab("budget");
   };
 
-  const computedLines = useMemo(() => {
-    return lines.map(l => {
-      const item = ITEM_MAP[l.itemId];
-      const cat = CAT_MAP[l.itemId];
-      const subtotal = item.unit==="%" ? 0 : l.qty * item.unitCost;
-      return {...l, item, cat, subtotal};
-    });
-  }, [lines]);
+  const computedLines = useMemo(() => lines.map(l => {
+    const item=ITEM_MAP[l.itemId]; const cat=CAT_MAP[l.itemId];
+    return {...l, item, cat, subtotal: l.qty*item.unitCost};
+  }), [lines]);
 
-  const equipTotal = computedLines.reduce((s,l) => s+l.subtotal, 0);
-  const subWithSW  = equipTotal + softwareBudget;
-  const freightAmt = subWithSW * (freightPct/100);
-  const contAmt    = (subWithSW+freightAmt) * (contingency/100);
-  const grand      = subWithSW + freightAmt + contAmt;
-  const marginAmt  = grand * (marginPct/100);
-  const costBasis  = grand - marginAmt;
-  const selCount   = lines.length;
+  const equipTotal  = computedLines.reduce((s,l)=>s+l.subtotal,0);
+  const subWithSW   = equipTotal + softwareBudget;
+  const freightAmt  = subWithSW * (freightPct/100);
+  // Additional margin & contingency on top of baked-in rates
+  const addlContAmt   = (subWithSW + freightAmt) * (contingency/100);
+  const addlMarginAmt = (subWithSW + freightAmt + addlContAmt) * (marginPct/100);
+  const grand       = subWithSW + freightAmt + addlContAmt + addlMarginAmt;
+  const selCount    = lines.length;
 
   const instanceCount = {};
-  lines.forEach(l => { instanceCount[l.itemId] = (instanceCount[l.itemId]||0)+1; });
+  lines.forEach(l => { instanceCount[l.itemId]=(instanceCount[l.itemId]||0)+1; });
 
   const clearBuilder = () => {
     setLines([]); setProjName("New Project"); setSaveCustomer(""); setSaveUser("");
-    setFreightPct(5); setContingency(15); setMarginPct(30);
+    setFreightPct(5); setContingency(0); setMarginPct(0);
     setSoftwareBudget(0); setSoftwareRaw(""); setEditingQuoteId(null);
   };
 
   const doSaveQuote = async () => {
     const quote = {
-      id: editingQuoteId || Date.now(),
+      id: editingQuoteId||Date.now(),
       date: new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}),
       projectName:projName, customer:saveCustomer, user:saveUser,
-      lines: computedLines.map(l => ({ instanceId:l.instanceId, itemId:l.itemId, name:l.item.name, label:l.label, category:l.cat.category, unit:l.item.unit, unitCost:l.item.unitCost, qty:l.qty, subtotal:l.subtotal })),
-      equipTotal, softwareBudget, subWithSW, freightAmt, freightPct, contAmt, contingency, grand, marginAmt, marginPct, costBasis,
+      lines: computedLines.map(l=>({instanceId:l.instanceId,itemId:l.itemId,name:l.item.name,label:l.label,category:l.cat.category,unit:l.item.unit,unitCost:l.item.unitCost,qty:l.qty,subtotal:l.subtotal})),
+      equipTotal, softwareBudget, subWithSW, freightAmt, freightPct,
+      addlContAmt, contingency, addlMarginAmt, marginPct, grand,
     };
-    // Replace if editing, prepend if new
-    const updated = editingQuoteId
-      ? savedQuotes.map(q => q.id===editingQuoteId ? quote : q)
-      : [quote, ...savedQuotes];
+    const updated = editingQuoteId ? savedQuotes.map(q=>q.id===editingQuoteId?quote:q) : [quote,...savedQuotes];
     setSavedQuotes(updated);
-    try { await storage.set("savedQuotes", JSON.stringify(updated)); } catch(e) {}
+    try { await storage.set("savedQuotes",JSON.stringify(updated)); } catch(e) {}
     setShowSaveModal(false); setSaveSuccess(true); setTimeout(()=>setSaveSuccess(false),3000);
     setEditingQuoteId(quote.id);
   };
 
   const deleteQuote = async (id) => {
-    const updated = savedQuotes.filter(q => q.id!==id);
+    const updated=savedQuotes.filter(q=>q.id!==id);
     setSavedQuotes(updated);
-    try { await storage.set("savedQuotes", JSON.stringify(updated)); } catch(e) {}
-    if (editingQuoteId===id) { setEditingQuoteId(null); }
+    try { await storage.set("savedQuotes",JSON.stringify(updated)); } catch(e) {}
+    if (editingQuoteId===id) setEditingQuoteId(null);
   };
 
   const downloadExcel = (quote) => {
-    const XLSX=window.XLSX; if (!XLSX){alert("Excel library not loaded yet.");return;}
+    const XLSX=window.XLSX; if(!XLSX){alert("Excel library not loaded yet.");return;}
     const wb=XLSX.utils.book_new();
     const summaryData=[
       ["RULE OF THUMB BUDGET TOOL"],["ROM Estimate — For Planning Purposes Only"],[],
       ["Project",quote.projectName],["Customer",quote.customer],["Prepared By",quote.user],["Date",quote.date],[],
+      ["NOTE: All catalog unit prices include baked-in 21% margin and 3% contingency."],[],
       ["CATEGORY","ITEM","DESCRIPTION/LABEL","UNIT","UNIT PRICE","QTY","SUBTOTAL"],
     ];
     const byCategory={};
@@ -357,18 +349,19 @@ function App() {
       summaryData.push([]);
     });
     summaryData.push(["BUDGET SUMMARY"]);
-    summaryData.push(["Turnkey Subtotal","","","","","",quote.equipTotal]);
-    if(quote.softwareBudget>0){summaryData.push(["Software Budget","","","","","",quote.softwareBudget]);summaryData.push(["Combined Subtotal","","","","","",quote.subWithSW]);}
+    summaryData.push(["Turnkey Subtotal (incl. 21% margin + 3% contingency)","","","","","",quote.equipTotal]);
+    if(quote.softwareBudget>0){
+      summaryData.push(["Software Budget","","","","","",quote.softwareBudget]);
+      summaryData.push(["Combined Subtotal","","","","","",quote.subWithSW]);
+    }
     summaryData.push([`Freight & Rigging (${quote.freightPct}%)`,"","","","","",quote.freightAmt]);
-    summaryData.push([`Contingency (${quote.contingency}%)`,"","","","","",quote.contAmt]);
-    summaryData.push(["TOTAL TURNKEY ESTIMATE","","","","","",quote.grand]);
+    if(quote.contingency>0) summaryData.push([`Additional Contingency (${quote.contingency}%)`,"","","","","",quote.addlContAmt]);
+    if(quote.marginPct>0)   summaryData.push([`Additional Margin (${quote.marginPct}%)`,"","","","","",quote.addlMarginAmt]);
+    summaryData.push(["TOTAL ROM ESTIMATE","","","","","",quote.grand]);
     summaryData.push([]);
-    summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`,"","","","","",quote.marginAmt]);
-    summaryData.push(["Cost Basis","","","","","",quote.costBasis]);
-    summaryData.push([]);
-    summaryData.push(["DISCLAIMER: All prices are turnkey ROM estimates ±20%. For planning purposes only — not a formal quotation."]);
+    summaryData.push(["DISCLAIMER: All prices are turnkey ROM estimates ±20%. Catalog pricing includes 21% margin and 3% contingency. For planning purposes only — not a formal quotation."]);
     const ws=XLSX.utils.aoa_to_sheet(summaryData);
-    ws["!cols"]=[{wch:28},{wch:44},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
+    ws["!cols"]=[{wch:46},{wch:40},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
     XLSX.utils.book_append_sheet(wb,ws,"Quote");
     const indexData=[["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
     const ws2=XLSX.utils.aoa_to_sheet(indexData);
@@ -390,6 +383,13 @@ function App() {
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>EQUIPMENT & SERVICES CATALOG</div>
         <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Click + to add · add same item multiple times</div>
+        {/* Baked-in rates notice */}
+        <div style={{marginTop:"8px",padding:"8px 10px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"4px"}}>
+          <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.08em",marginBottom:"2px"}}>⬡ PRICING NOTE</div>
+          <div style={{fontSize:"11px",color:TEXTDIM,lineHeight:1.5}}>
+            All unit prices already include <span style={{color:GOLD}}>21% margin</span> and <span style={{color:GOLD}}>3% contingency</span>. Use the additional margin &amp; contingency fields in the budget summary only if the project warrants going above these baked-in rates.
+          </div>
+        </div>
       </div>
       {CATALOG.map(cat=>{
         const addedN=cat.items.reduce((s,i)=>s+(instanceCount[i.id]||0),0);
@@ -439,7 +439,6 @@ function App() {
       ):(
         <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
 
-          {/* Editing banner */}
           {editingQuoteId&&(
             <div style={{marginBottom:"14px",padding:"9px 12px",background:"rgba(255,191,0,0.07)",border:"1px solid rgba(255,191,0,0.3)",borderRadius:"5px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
               <div style={{fontSize:"11px",color:GOLD}}>✎ Editing saved quote — save to update, or clear to start fresh</div>
@@ -488,23 +487,33 @@ function App() {
             );
           })}
 
-          {/* Summary */}
+          {/* ── Summary ── */}
           <div style={{marginTop:"20px",background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
             <div style={{padding:"10px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGET SUMMARY</div>
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
-              <div>
-                <span style={{fontSize:"13px",color:"#8A8880"}}>Turnkey Subtotal</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Equip + install + commissioning + eng + margin</div>
+
+            {/* Turnkey subtotal with baked-in rates badge */}
+            <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div style={{flex:1}}>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Turnkey Subtotal</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Equip + install + commissioning + eng</div>
+                  {/* Baked-in badge */}
+                  <div style={{marginTop:"6px",display:"inline-flex",alignItems:"center",gap:"6px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"3px",padding:"3px 8px"}}>
+                    <span style={{fontSize:"10px",color:GOLD}}>⬡ Includes baked-in {BASE_MARGIN_PCT}% margin + {BASE_CONT_PCT}% contingency</span>
+                  </div>
+                </div>
+                <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT,flexShrink:0,paddingLeft:"12px"}}>{fmtFull(equipTotal)}</span>
               </div>
-              <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT}}>{fmtFull(equipTotal)}</span>
             </div>
+
+            {/* Software */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(155,93,229,0.04)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                 <div>
                   <span style={{fontSize:"13px",color:"#8A8880"}}>Software Budget</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WES / WCS</div>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS</div>
                 </div>
                 {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareBudget)}</span>}
               </div>
@@ -517,6 +526,8 @@ function App() {
                 {softwareBudget>0&&<button onClick={()=>{setSoftwareBudget(0);setSoftwareRaw("");}} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"5px 8px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Clear</button>}
               </div>
             </div>
+
+            {/* Freight */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                 <div>
@@ -532,41 +543,50 @@ function App() {
               </div>
               <div style={{fontSize:"10px",color:FADE,marginTop:"6px"}}>3–4% light/small · 5–6% typical MHE · 8% heavy/robotic</div>
             </div>
+
+            {/* Additional Contingency */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
                 <div>
-                  <span style={{fontSize:"13px",color:"#8A8880"}}>Contingency</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Applied to turnkey + freight</div>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Additional Contingency</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>
+                    On top of baked-in {BASE_CONT_PCT}% · use for high-risk or early-stage projects
+                  </div>
                 </div>
-                <span style={{fontSize:"14px",color:GOLD}}>{fmtFull(contAmt)}</span>
+                <span style={{fontSize:"14px",color:GOLD}}>{addlContAmt>0?fmtFull(addlContAmt):<span style={{color:MUTE}}>—</span>}</span>
               </div>
               <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-                {[1,3,5,10,15,20,25].map(p=>(
-                  <button key={p} onClick={()=>setContingency(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:contingency===p?"rgba(255,107,53,0.2)":"transparent",border:contingency===p?"1px solid rgba(255,107,53,0.5)":`1px solid ${BORDER}`,color:contingency===p?ACCENT:FADE}}>{p}%</button>
+                {[0,2,5,10,15,20].map(p=>(
+                  <button key={p} onClick={()=>setContingency(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:contingency===p?"rgba(255,191,0,0.2)":"transparent",border:contingency===p?"1px solid rgba(255,191,0,0.5)":`1px solid ${BORDER}`,color:contingency===p?GOLD:FADE}}>{p===0?"None":`+${p}%`}</button>
                 ))}
               </div>
+              {contingency>0&&<div style={{fontSize:"10px",color:GOLD,marginTop:"5px"}}>Total contingency: {BASE_CONT_PCT + contingency}% ({BASE_CONT_PCT}% baked-in + {contingency}% additional)</div>}
             </div>
+
+            {/* Additional Margin */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(46,196,182,0.04)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
                 <div>
-                  <span style={{fontSize:"13px",color:"#8A8880"}}>Estimated Margin</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Cost basis: {fmtFull(costBasis)} · GP on sell price</div>
+                  <span style={{fontSize:"13px",color:"#8A8880"}}>Additional Margin</span>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>
+                    On top of baked-in {BASE_MARGIN_PCT}% · use for complex scope or risk premium
+                  </div>
                 </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:"14px",color:"#2EC4B6"}}>{fmtFull(marginAmt)}</div>
-                  <div style={{fontSize:"10px",color:MUTE}}>{marginPct}% GP</div>
-                </div>
+                <span style={{fontSize:"14px",color:"#2EC4B6"}}>{addlMarginAmt>0?fmtFull(addlMarginAmt):<span style={{color:MUTE}}>—</span>}</span>
               </div>
               <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-                {[20,23,25,30,35,40].map(p=>(
-                  <button key={p} onClick={()=>setMarginPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:marginPct===p?"rgba(46,196,182,0.2)":"transparent",border:marginPct===p?"1px solid rgba(46,196,182,0.5)":`1px solid ${BORDER}`,color:marginPct===p?"#2EC4B6":FADE}}>{p}%</button>
+                {[0,2,4,5,9,14,19].map(p=>(
+                  <button key={p} onClick={()=>setMarginPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:marginPct===p?"rgba(46,196,182,0.2)":"transparent",border:marginPct===p?"1px solid rgba(46,196,182,0.5)":`1px solid ${BORDER}`,color:marginPct===p?"#2EC4B6":FADE}}>{p===0?"None":`+${p}%`}</button>
                 ))}
               </div>
+              {marginPct>0&&<div style={{fontSize:"10px",color:"#2EC4B6",marginTop:"5px"}}>Total margin: {BASE_MARGIN_PCT + marginPct}% ({BASE_MARGIN_PCT}% baked-in + {marginPct}% additional)</div>}
             </div>
+
+            {/* Grand total */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"15px 14px",background:"linear-gradient(135deg,rgba(255,107,53,0.08),rgba(255,191,0,0.05))"}}>
               <div>
-                <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE}}>TOTAL TURNKEY ESTIMATE</div>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>ROM ±20% · includes freight & contingency</div>
+                <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE}}>TOTAL ROM ESTIMATE</div>
+                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>ROM ±20% · incl. freight{contingency>0?` · +${contingency}% addl. contingency`:""}  {marginPct>0?` · +${marginPct}% addl. margin`:""}</div>
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:mobile?"22px":"26px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</div>
@@ -578,7 +598,7 @@ function App() {
           <div style={{marginTop:"16px",display:"flex",gap:"10px"}}>
             <button onClick={()=>setShowSaveModal(true)}
               style={{flex:1,padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.15)":"rgba(255,107,53,0.15)",border:editingQuoteId?"1px solid rgba(255,191,0,0.5)":"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-              {editingQuoteId ? "💾 UPDATE QUOTE" : "💾 SAVE QUOTE"}
+              {editingQuoteId?"💾 UPDATE QUOTE":"💾 SAVE QUOTE"}
             </button>
             {editingQuoteId&&(
               <button onClick={clearBuilder}
@@ -588,8 +608,9 @@ function App() {
             )}
           </div>
           {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"Quote saved"} successfully</div>}
+
           <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All prices are turnkey ROM estimates ±20% including equipment, installation labor, commissioning, engineering, and integrator margin. Freight is estimated separately. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
+            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are turnkey ROM estimates ±20% and already include 21% margin and 3% contingency. Additional margin and contingency fields apply on top of these baked-in rates. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
           </div>
         </div>
       )}
@@ -611,9 +632,7 @@ function App() {
         </div>
       ):savedQuotes.map(q=>(
         <div key={q.id} style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,background:editingQuoteId===q.id?"rgba(255,191,0,0.04)":BGCARD,borderLeft:editingQuoteId===q.id?`3px solid ${GOLD}`:"3px solid transparent"}}>
-          {editingQuoteId===q.id&&(
-            <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.1em",marginBottom:"6px"}}>✎ CURRENTLY EDITING</div>
-          )}
+          {editingQuoteId===q.id&&<div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.1em",marginBottom:"6px"}}>✎ CURRENTLY EDITING</div>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic"}}>{q.projectName}</div>
@@ -626,12 +645,9 @@ function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
-            <button onClick={()=>{
-                if (lines.length>0 && editingQuoteId!==q.id) { setShowLoadConfirm(q); }
-                else { loadQuote(q); }
-              }}
+            <button onClick={()=>{ if(lines.length>0&&editingQuoteId!==q.id){setShowLoadConfirm(q);}else{loadQuote(q);}}}
               style={{flex:1,padding:"7px 10px",background:editingQuoteId===q.id?"rgba(255,191,0,0.1)":"rgba(255,107,53,0.1)",border:editingQuoteId===q.id?"1px solid rgba(255,191,0,0.4)":"1px solid rgba(255,107,53,0.4)",borderRadius:"4px",color:editingQuoteId===q.id?GOLD:ACCENT,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
-              {editingQuoteId===q.id ? "✎ EDITING" : "✎ LOAD & EDIT"}
+              {editingQuoteId===q.id?"✎ EDITING":"✎ LOAD & EDIT"}
             </button>
             <button onClick={()=>downloadExcel(q)}
               style={{flex:1,padding:"7px 10px",background:"rgba(46,196,182,0.1)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
@@ -643,21 +659,14 @@ function App() {
         </div>
       ))}
 
-      {/* Load confirmation modal */}
       {showLoadConfirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
           <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
             <div style={{fontSize:"14px",color:TEXT,marginBottom:"8px"}}>Load <span style={{color:ACCENT,fontStyle:"italic"}}>{showLoadConfirm.projectName}</span>?</div>
             <div style={{fontSize:"12px",color:FADE,marginBottom:"20px"}}>Your current unsaved work will be replaced.</div>
             <div style={{display:"flex",gap:"10px"}}>
-              <button onClick={()=>loadQuote(showLoadConfirm)}
-                style={{flex:1,padding:"10px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"4px",color:ACCENT,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-                Load Quote
-              </button>
-              <button onClick={()=>setShowLoadConfirm(null)}
-                style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>
-                Cancel
-              </button>
+              <button onClick={()=>loadQuote(showLoadConfirm)} style={{flex:1,padding:"10px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"4px",color:ACCENT,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>Load Quote</button>
+              <button onClick={()=>setShowLoadConfirm(null)} style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Cancel</button>
             </div>
           </div>
         </div>
@@ -709,8 +718,7 @@ function App() {
         </div>
         {!mobile&&(
           <div style={{display:"flex",alignItems:"center",gap:"6px",flex:1,justifyContent:"center"}}>
-            {nameEditor(false)}
-            <span style={{fontSize:"10px",color:MUTE}}>✎</span>
+            {nameEditor(false)}<span style={{fontSize:"10px",color:MUTE}}>✎</span>
           </div>
         )}
         <div style={{display:"flex",alignItems:"center",gap:"5px",background:"rgba(255,107,53,0.1)",border:"1px solid rgba(255,107,53,0.3)",borderRadius:"20px",padding:"4px 10px",flexShrink:0}}>
