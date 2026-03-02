@@ -352,7 +352,7 @@ function App() {
     summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`, "", "", "", "", "", quote.marginAmt]);
     summaryData.push(["Cost Basis", "", "", "", "", "", quote.costBasis]);
     summaryData.push([]);
-    summaryData.push(["DISCLAIMER: All prices are turnkey budgetary estimates ±25%. For planning purposes only — not a formal quotation."]);
+    summaryData.push(["DISCLAIMER: All prices are turnkey ROM estimates ±20%. For planning purposes only — not a formal quotation."]);
     const ws = XLSX.utils.aoa_to_sheet(summaryData);
     ws["!cols"] = [{wch:28},{wch:44},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
     XLSX.utils.book_append_sheet(wb, ws, "Quote");
@@ -436,7 +436,7 @@ function App() {
           <div style={{marginBottom:"16px"}}>
             <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGETARY ESTIMATE</div>
             <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
-            <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>All pricing ±25% budgetary</div>
+            <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% budgetary</div>
           </div>
 
           {CATALOG.map(cat => {
@@ -574,7 +574,7 @@ function App() {
           </div>
           {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ Quote saved successfully</div>}
           <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All prices are turnkey budgetary estimates including equipment, installation labor, commissioning, engineering, and integrator margin. Freight is estimated separately. Total carries a ±25% variance. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
+            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All prices are turnkey ROM estimates including equipment, installation labor, commissioning, engineering, and integrator margin. Freight is estimated separately. Total carries a ±20% variance. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
           </div>
         </div>
       )}
