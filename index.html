@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Rule of Thumb Budget Tool</title>
   <meta name="description" content="MHE Budgetary Estimating Tool — Warehouse & Distribution" />
-  <meta name="theme-color" content="#0D0F14" />
+  <meta name="theme-color" content="#FF6B35" />
   <link rel="manifest" href="manifest.json" />
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -92,14 +92,6 @@ const storage = (() => {
         const store = await tx("readwrite", s => s);
         const req = store.put({ key, value });
         req.onsuccess = () => res({ key, value });
-        req.onerror = rej;
-      });
-    },
-    async delete(key) {
-      return new Promise(async (res, rej) => {
-        const store = await tx("readwrite", s => s);
-        const req = store.delete(key);
-        req.onsuccess = () => res({ key, deleted: true });
         req.onerror = rej;
       });
     },
@@ -215,11 +207,21 @@ const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000)
 const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
 const BG="#0D0F14",BGDEEP="#090B0F",BGCARD="#0F1218",BGROW="#141820",BORDER="#1C2030",BORDER2="#252830",TEXT="#DDD9D0",TEXTDIM="#AAA69E",MUTE="#5A5850",FADE="#4A4E5A",ACCENT="#FF6B35",GOLD="#FFBF00";
 
+// ── Lookup map for catalog items by id ───────────────────────────────────
+const ITEM_MAP = {};
+const CAT_MAP = {};
+CATALOG.forEach(cat => cat.items.forEach(item => {
+  ITEM_MAP[item.id] = item;
+  CAT_MAP[item.id] = cat;
+}));
+
 function App() {
   const containerRef = useRef(null);
   const [width, setWidth] = useState(900);
   const [mobileTab, setMobileTab] = useState("catalog");
-  const [selected, setSelected] = useState({});
+
+  // ── lines: array of { instanceId, itemId, qty, raw, label }
+  const [lines, setLines] = useState([]);
   const [expanded, setExpanded] = useState({"Conveyor":true});
   const [contingency, setContingency] = useState(15);
   const [freightPct, setFreightPct] = useState(5);
@@ -233,6 +235,7 @@ function App() {
   const [saveUser, setSaveUser] = useState("");
   const [savedQuotes, setSavedQuotes] = useState([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const instanceCounter = useRef(0);
 
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
@@ -248,93 +251,116 @@ function App() {
 
   const mobile = width < 680;
 
-  const toggleItem = (item) => setSelected(p => {
-    if (p[item.id]) { const n={...p}; delete n[item.id]; return n; }
-    return {...p, [item.id]:{qty:item.defaultQty, raw:String(item.defaultQty)}};
-  });
-  const handleQtyChange = (id, raw) => setSelected(p => ({...p,[id]:{...p[id],raw}}));
-  const commitQty = (id) => setSelected(p => {
-    const raw=p[id]?.raw??""; const n=parseFloat(raw);
-    const qty=(!isNaN(n)&&n>=0)?n:(p[id]?.qty??0);
-    return {...p,[id]:{...p[id],qty,raw:String(qty)}};
-  });
+  // ── Add a new instance of an item ────────────────────────────────────────
+  const addItem = (item) => {
+    instanceCounter.current += 1;
+    setLines(prev => [...prev, {
+      instanceId: `${item.id}_${instanceCounter.current}`,
+      itemId: item.id,
+      qty: item.defaultQty,
+      raw: String(item.defaultQty),
+      label: "",
+    }]);
+  };
 
-  const lines = useMemo(() => {
-    const res=[];
-    CATALOG.forEach(cat=>cat.items.forEach(item=>{
-      if(!selected[item.id])return;
-      const qty=selected[item.id].qty;
-      res.push({...item,qty,subtotal:item.unit==="%"?null:qty*item.unitCost,catColor:cat.color,category:cat.category});
-    }));
-    const eq=res.filter(i=>i.unit!=="%").reduce((s,i)=>s+i.subtotal,0);
-    res.forEach(i=>{if(i.unit==="%")i.subtotal=(i.qty/100)*eq;});
-    return res;
-  },[selected]);
+  const removeInstance = (instanceId) => setLines(prev => prev.filter(l => l.instanceId !== instanceId));
 
-  const equipTotal=lines.reduce((s,i)=>s+i.subtotal,0);
-  const subWithSW=equipTotal+softwareBudget;
-  const freightAmt=subWithSW*(freightPct/100);
-  const contAmt=(subWithSW+freightAmt)*(contingency/100);
-  const grand=subWithSW+freightAmt+contAmt;
-  const marginAmt=grand*(marginPct/100);
-  const costBasis=grand-marginAmt;
-  const selCount=Object.keys(selected).length;
+  const updateQtyRaw = (instanceId, raw) => setLines(prev => prev.map(l => l.instanceId === instanceId ? {...l, raw} : l));
+
+  const commitQty = (instanceId) => setLines(prev => prev.map(l => {
+    if (l.instanceId !== instanceId) return l;
+    const n = parseFloat(l.raw);
+    const qty = (!isNaN(n) && n >= 0) ? n : l.qty;
+    return {...l, qty, raw: String(qty)};
+  }));
+
+  const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId === instanceId ? {...l, label} : l));
+
+  // ── Computed lines with subtotals ────────────────────────────────────────
+  const computedLines = useMemo(() => {
+    return lines.map(l => {
+      const item = ITEM_MAP[l.itemId];
+      const cat = CAT_MAP[l.itemId];
+      const subtotal = item.unit === "%" ? 0 : l.qty * item.unitCost;
+      return { ...l, item, cat, subtotal };
+    });
+  }, [lines]);
+
+  const equipTotal = computedLines.reduce((s, l) => s + l.subtotal, 0);
+  const subWithSW  = equipTotal + softwareBudget;
+  const freightAmt = subWithSW * (freightPct / 100);
+  const contAmt    = (subWithSW + freightAmt) * (contingency / 100);
+  const grand      = subWithSW + freightAmt + contAmt;
+  const marginAmt  = grand * (marginPct / 100);
+  const costBasis  = grand - marginAmt;
+  const selCount   = lines.length;
+
+  // Count instances per catalog item for badge
+  const instanceCount = {};
+  lines.forEach(l => { instanceCount[l.itemId] = (instanceCount[l.itemId] || 0) + 1; });
 
   const doSaveQuote = async () => {
-    const quote={
-      id:Date.now(),
-      date:new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}),
-      projectName:projName, customer:saveCustomer, user:saveUser,
-      lines:lines.map(l=>({id:l.id,name:l.name,category:l.category,unit:l.unit,unitCost:l.unitCost,qty:l.qty,subtotal:l.subtotal})),
-      equipTotal,softwareBudget,subWithSW,freightAmt,freightPct,contAmt,contingency,grand,marginAmt,marginPct,costBasis,
+    const quote = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}),
+      projectName: projName, customer: saveCustomer, user: saveUser,
+      lines: computedLines.map(l => ({
+        instanceId: l.instanceId, itemId: l.itemId, name: l.item.name,
+        label: l.label, category: l.cat.category, unit: l.item.unit,
+        unitCost: l.item.unitCost, qty: l.qty, subtotal: l.subtotal,
+      })),
+      equipTotal, softwareBudget, subWithSW, freightAmt, freightPct, contAmt, contingency, grand, marginAmt, marginPct, costBasis,
     };
-    const updated=[quote,...savedQuotes];
+    const updated = [quote, ...savedQuotes];
     setSavedQuotes(updated);
-    try { await storage.set("savedQuotes",JSON.stringify(updated)); } catch(e) {}
-    setShowSaveModal(false); setSaveSuccess(true); setTimeout(()=>setSaveSuccess(false),3000);
+    try { await storage.set("savedQuotes", JSON.stringify(updated)); } catch(e) {}
+    setShowSaveModal(false); setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   const deleteQuote = async (id) => {
-    const updated=savedQuotes.filter(q=>q.id!==id);
+    const updated = savedQuotes.filter(q => q.id !== id);
     setSavedQuotes(updated);
-    try { await storage.set("savedQuotes",JSON.stringify(updated)); } catch(e) {}
+    try { await storage.set("savedQuotes", JSON.stringify(updated)); } catch(e) {}
   };
 
   const downloadExcel = (quote) => {
-    const XLSX=window.XLSX; if(!XLSX){alert("Excel library not loaded yet — try again in a moment.");return;}
-    const wb=XLSX.utils.book_new();
-    const summaryData=[
-      ["RULE OF THUMB BUDGET TOOL"],["Budgetary Estimate — For Planning Purposes Only"],[],
-      ["Project",quote.projectName],["Customer",quote.customer],["Prepared By",quote.user],["Date",quote.date],[],
-      ["CATEGORY","ITEM","UNIT","UNIT PRICE","QTY","SUBTOTAL"],
+    const XLSX = window.XLSX; if (!XLSX) { alert("Excel library not loaded yet."); return; }
+    const wb = XLSX.utils.book_new();
+    const summaryData = [
+      ["RULE OF THUMB BUDGET TOOL"], ["Budgetary Estimate — For Planning Purposes Only"], [],
+      ["Project", quote.projectName], ["Customer", quote.customer], ["Prepared By", quote.user], ["Date", quote.date], [],
+      ["CATEGORY", "ITEM", "DESCRIPTION/LABEL", "UNIT", "UNIT PRICE", "QTY", "SUBTOTAL"],
     ];
-    const byCategory={};
-    quote.lines.forEach(l=>{if(!byCategory[l.category])byCategory[l.category]=[];byCategory[l.category].push(l);});
-    Object.entries(byCategory).forEach(([cat,items])=>{
-      const catTotal=items.reduce((s,i)=>s+i.subtotal,0);
-      items.forEach((l,idx)=>summaryData.push([idx===0?cat:"",l.name,l.unit,l.unitCost,l.qty,l.subtotal]));
-      summaryData.push(["",`${cat} Subtotal`,"","","",catTotal]);
+    const byCategory = {};
+    quote.lines.forEach(l => { if (!byCategory[l.category]) byCategory[l.category] = []; byCategory[l.category].push(l); });
+    Object.entries(byCategory).forEach(([cat, items]) => {
+      const catTotal = items.reduce((s, i) => s + i.subtotal, 0);
+      items.forEach((l, idx) => summaryData.push([idx===0?cat:"", l.name, l.label||"", l.unit, l.unitCost, l.qty, l.subtotal]));
+      summaryData.push(["", `${cat} Subtotal`, "", "", "", "", catTotal]);
       summaryData.push([]);
     });
     summaryData.push(["BUDGET SUMMARY"]);
-    summaryData.push(["Turnkey Subtotal","","","","",quote.equipTotal]);
-    if(quote.softwareBudget>0){summaryData.push(["Software Budget","","","","",quote.softwareBudget]);summaryData.push(["Combined Subtotal","","","","",quote.subWithSW]);}
-    summaryData.push([`Freight & Rigging (${quote.freightPct}%)`,"","","","",quote.freightAmt]);
-    summaryData.push([`Contingency (${quote.contingency}%)`,"","","","",quote.contAmt]);
-    summaryData.push(["TOTAL TURNKEY ESTIMATE","","","","",quote.grand]);
+    summaryData.push(["Turnkey Subtotal", "", "", "", "", "", quote.equipTotal]);
+    if (quote.softwareBudget > 0) {
+      summaryData.push(["Software Budget", "", "", "", "", "", quote.softwareBudget]);
+      summaryData.push(["Combined Subtotal", "", "", "", "", "", quote.subWithSW]);
+    }
+    summaryData.push([`Freight & Rigging (${quote.freightPct}%)`, "", "", "", "", "", quote.freightAmt]);
+    summaryData.push([`Contingency (${quote.contingency}%)`, "", "", "", "", "", quote.contAmt]);
+    summaryData.push(["TOTAL TURNKEY ESTIMATE", "", "", "", "", "", quote.grand]);
     summaryData.push([]);
-    summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`,"","","","",quote.marginAmt]);
-    summaryData.push(["Cost Basis","","","","",quote.costBasis]);
+    summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`, "", "", "", "", "", quote.marginAmt]);
+    summaryData.push(["Cost Basis", "", "", "", "", "", quote.costBasis]);
     summaryData.push([]);
     summaryData.push(["DISCLAIMER: All prices are turnkey budgetary estimates ±25%. For planning purposes only — not a formal quotation."]);
-    const ws=XLSX.utils.aoa_to_sheet(summaryData);
-    ws["!cols"]=[{wch:32},{wch:48},{wch:8},{wch:14},{wch:8},{wch:16}];
-    XLSX.utils.book_append_sheet(wb,ws,"Quote");
-    const indexData=[["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
-    const ws2=XLSX.utils.aoa_to_sheet(indexData);
-    ws2["!cols"]=[{wch:14},{wch:26},{wch:24},{wch:20},{wch:16}];
-    XLSX.utils.book_append_sheet(wb,ws2,"Saved Quotes");
-    XLSX.writeFile(wb,`${quote.projectName.replace(/[^a-zA-Z0-9_-]/g,"_")}_${quote.date.replace(/\s/g,"_")}.xlsx`);
+    const ws = XLSX.utils.aoa_to_sheet(summaryData);
+    ws["!cols"] = [{wch:28},{wch:44},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
+    XLSX.utils.book_append_sheet(wb, ws, "Quote");
+    const indexData = [["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
+    const ws2 = XLSX.utils.aoa_to_sheet(indexData);
+    ws2["!cols"] = [{wch:14},{wch:26},{wch:24},{wch:20},{wch:16}];
+    XLSX.utils.book_append_sheet(wb, ws2, "Saved Quotes");
+    XLSX.writeFile(wb, `${quote.projectName.replace(/[^a-zA-Z0-9_-]/g,"_")}_${quote.date.replace(/\s/g,"_")}.xlsx`);
   };
 
   const nameEditor = (small) => editingName ? (
@@ -344,15 +370,16 @@ function App() {
     <span onClick={()=>setEditingName(true)} style={{fontSize:small?"13px":"14px",color:small?TEXTDIM:TEXT,cursor:"text",borderBottom:`1px dashed ${BORDER}`}}>{projName}</span>
   );
 
+  // ── Catalog Panel ─────────────────────────────────────────────────────────
   const catalogPanel = (
     <div style={{flex:1,overflowY:"auto",background:BG,minHeight:0}}>
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>EQUIPMENT & SERVICES CATALOG</div>
-        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Tap to add · set quantity inline</div>
+        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Click + to add · add same item multiple times</div>
       </div>
-      {CATALOG.map(cat=>{
-        const addedN=cat.items.filter(i=>selected[i.id]).length;
-        const open=!!expanded[cat.category];
+      {CATALOG.map(cat => {
+        const addedN = cat.items.reduce((s,i) => s + (instanceCount[i.id]||0), 0);
+        const open = !!expanded[cat.category];
         return (
           <div key={cat.category} style={{borderBottom:`1px solid ${BORDER}`}}>
             <div onClick={e=>{e.preventDefault();setExpanded(p=>({...p,[cat.category]:!p[cat.category]}));}}
@@ -364,31 +391,28 @@ function App() {
               </div>
               <span style={{color:FADE,fontSize:"10px",flexShrink:0,marginLeft:"6px"}}>{open?"▲":"▼"}</span>
             </div>
-            {open&&cat.items.map(item=>{
-              const sel=!!selected[item.id];
+            {open && cat.items.map(item => {
+              const count = instanceCount[item.id] || 0;
               return (
-                <div key={item.id} style={{padding:"9px 14px 9px 28px",background:sel?cat.color+"0D":"transparent",borderLeft:sel?`3px solid ${cat.color}`:"3px solid transparent",borderBottom:`1px solid ${BGROW}`}}>
-                  <div style={{display:"flex",alignItems:"flex-start",gap:"10px",cursor:"pointer"}} onClick={()=>toggleItem(item)}>
-                    <div style={{width:"22px",height:"22px",borderRadius:"50%",flexShrink:0,marginTop:"1px",background:sel?cat.color:BORDER,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",color:sel?BGDEEP:MUTE}}>
-                      {sel?"✓":"+"}
-                    </div>
+                <div key={item.id} style={{padding:"9px 14px 9px 28px",background:count>0?cat.color+"0D":"transparent",borderLeft:count>0?`3px solid ${cat.color}`:"3px solid transparent",borderBottom:`1px solid ${BGROW}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                    <button onClick={()=>addItem(item)}
+                      style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:BGDEEP,cursor:"pointer",fontWeight:"bold",lineHeight:1}}>
+                      +
+                    </button>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:"13px",color:sel?TEXT:TEXTDIM,lineHeight:1.3}}>{item.name}</div>
-                      <div style={{fontSize:"11px",color:sel?cat.color:FADE,marginTop:"2px"}}>
-                        {item.unit==="%"?`${item.defaultQty}% of equip`:`${fmt(item.unitCost)} / ${item.unit}`}
+                      <div style={{fontSize:"13px",color:count>0?TEXT:TEXTDIM,lineHeight:1.3}}>{item.name}</div>
+                      <div style={{fontSize:"11px",color:count>0?cat.color:FADE,marginTop:"2px"}}>
+                        {`${fmt(item.unitCost)} / ${item.unit}`}
                         {item.note?` · ${item.note}`:""}
                       </div>
                     </div>
+                    {count>0&&(
+                      <span style={{fontSize:"11px",color:cat.color,background:cat.color+"20",border:`1px solid ${cat.color}40`,borderRadius:"10px",padding:"2px 8px",flexShrink:0}}>
+                        ×{count}
+                      </span>
+                    )}
                   </div>
-                  {sel&&(
-                    <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"8px",paddingLeft:"32px"}} onClick={e=>e.stopPropagation()}>
-                      <span style={{fontSize:"11px",color:MUTE}}>QTY</span>
-                      <input value={selected[item.id]?.raw??""} onChange={e=>handleQtyChange(item.id,e.target.value)} onBlur={()=>commitQty(item.id)} onClick={e=>e.stopPropagation()} inputMode="decimal"
-                        style={{width:"72px",textAlign:"right",background:BGROW,border:`1px solid ${cat.color}60`,borderRadius:"3px",padding:"5px 8px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
-                      <span style={{fontSize:"11px",color:MUTE}}>{item.unit}</span>
-                      <span style={{fontSize:"12px",color:cat.color,fontStyle:"italic",marginLeft:"auto"}}>{fmtFull((selected[item.id]?.qty??0)*item.unitCost)}</span>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -398,13 +422,14 @@ function App() {
     </div>
   );
 
+  // ── Budget Panel ──────────────────────────────────────────────────────────
   const budgetPanel = (
     <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
       {selCount===0?(
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"280px",gap:"12px",color:FADE,padding:"32px 20px",textAlign:"center"}}>
           <div style={{fontSize:"36px"}}>◻</div>
           <div style={{fontSize:"15px",fontStyle:"italic",color:MUTE}}>No items added yet</div>
-          <div style={{fontSize:"13px"}}>Browse the catalog and tap items to build your budget</div>
+          <div style={{fontSize:"13px"}}>Browse the catalog and click + to add items</div>
         </div>
       ):(
         <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
@@ -413,30 +438,37 @@ function App() {
             <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
             <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>All pricing ±25% budgetary</div>
           </div>
-          {CATALOG.map(cat=>{
-            const catLines=lines.filter(l=>l.category===cat.category);
-            if(!catLines.length)return null;
-            const catTotal=catLines.reduce((s,l)=>s+l.subtotal,0);
+
+          {CATALOG.map(cat => {
+            const catLines = computedLines.filter(l => l.cat.category === cat.category);
+            if (!catLines.length) return null;
+            const catTotal = catLines.reduce((s,l) => s+l.subtotal, 0);
             return (
               <div key={cat.category} style={{marginBottom:"18px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:cat.color+"12",borderLeft:`3px solid ${cat.color}`,borderRadius:"0 4px 4px 0",marginBottom:"2px"}}>
                   <span style={{fontSize:"11px",letterSpacing:"0.1em",color:cat.color}}>{cat.icon} {cat.category.toUpperCase()}</span>
                   <span style={{fontSize:"13px",color:cat.color,fontStyle:"italic"}}>{fmtFull(catTotal)}</span>
                 </div>
-                {catLines.map(line=>(
-                  <div key={line.id} style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`}}>
+                {catLines.map(line => (
+                  <div key={line.instanceId} style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:"13px",color:TEXT,lineHeight:1.3}}>{line.name}</div>
-                        {line.note&&<div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>{line.note}</div>}
+                        <div style={{fontSize:"13px",color:TEXT,lineHeight:1.3}}>{line.item.name}</div>
+                        {/* Editable label */}
+                        <input
+                          value={line.label}
+                          onChange={e=>updateLabel(line.instanceId, e.target.value)}
+                          placeholder="Add description (e.g. Receiving zone)..."
+                          style={{marginTop:"4px",width:"100%",background:"transparent",border:"none",borderBottom:`1px dashed ${BORDER}`,color:TEXTDIM,fontSize:"11px",fontFamily:"Georgia,serif",outline:"none",padding:"2px 0"}}
+                        />
                       </div>
-                      <button onClick={()=>toggleItem(line)} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",width:"24px",height:"24px",flexShrink:0,cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
+                      <button onClick={()=>removeInstance(line.instanceId)} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",width:"24px",height:"24px",flexShrink:0,cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
                     </div>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"7px",gap:"6px"}}>
-                      <span style={{fontSize:"11px",color:MUTE,flex:1}}>{line.unit==="%"?"% of equip":`${fmt(line.unitCost)} / ${line.unit}`}</span>
+                      <span style={{fontSize:"11px",color:MUTE,flex:1}}>{`${fmt(line.item.unitCost)} / ${line.item.unit}`}</span>
                       <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
                         <span style={{fontSize:"10px",color:FADE}}>QTY</span>
-                        <input value={selected[line.id]?.raw??""} onChange={e=>handleQtyChange(line.id,e.target.value)} onBlur={()=>commitQty(line.id)} inputMode="decimal"
+                        <input value={line.raw} onChange={e=>updateQtyRaw(line.instanceId,e.target.value)} onBlur={()=>commitQty(line.instanceId)} inputMode="decimal"
                           style={{width:"58px",textAlign:"right",background:BGROW,border:`1px solid ${BORDER2}`,borderRadius:"3px",padding:"4px 6px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
                       </div>
                       <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic",minWidth:"74px",textAlign:"right"}}>{fmtFull(line.subtotal)}</div>
@@ -446,6 +478,8 @@ function App() {
               </div>
             );
           })}
+
+          {/* Summary block */}
           <div style={{marginTop:"20px",background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
             <div style={{padding:"10px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGET SUMMARY</div>
@@ -461,7 +495,7 @@ function App() {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                 <div>
                   <span style={{fontSize:"13px",color:"#8A8880"}}>Software Budget</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS — enter client-supplied or estimated budget</div>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS</div>
                 </div>
                 {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareBudget)}</span>}
               </div>
@@ -531,6 +565,7 @@ function App() {
               </div>
             </div>
           </div>
+
           <div style={{marginTop:"16px",display:"flex",gap:"10px"}}>
             <button onClick={()=>setShowSaveModal(true)}
               style={{flex:1,padding:"12px",background:"rgba(255,107,53,0.15)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
@@ -546,6 +581,7 @@ function App() {
     </div>
   );
 
+  // ── Saved Quotes Panel ────────────────────────────────────────────────────
   const savedPanel = (
     <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
@@ -584,6 +620,7 @@ function App() {
     </div>
   );
 
+  // ── Save Modal ────────────────────────────────────────────────────────────
   const saveModal = showSaveModal && (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
       <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"400px",overflow:"hidden"}}>
