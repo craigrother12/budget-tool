@@ -139,21 +139,21 @@ const CATALOG = [
     { id:"ca21", name:"Gravity Spiral (10')",                            unit:"EA", unitCost:49100,  defaultQty:1, note:"" },
   ]},
   { category: "Sortation Equipment", icon: "⑆", color: "#FFBF00", items: [
-    { id:"s1",  name:"Induction Belt",                                    unit:"EA", unitCost:36300,  defaultQty:1, note:"" },
-    { id:"s2",  name:"Line Scanner (single side)",                        unit:"EA", unitCost:10600,  defaultQty:2, note:"" },
-    { id:"s3",  name:"Omni Scanner (2-sided)",                            unit:"EA", unitCost:22100,  defaultQty:2, note:"" },
-    { id:"s4",  name:"Scanner Tunnel (5-sided)",                          unit:"EA", unitCost:95130,  defaultQty:1, note:"" },
-    { id:"s5",  name:"Periscope Scanner",                                 unit:"EA", unitCost:12500,  defaultQty:2, note:"" },
-    { id:"s6",  name:"Camera Scanner (single side)",                      unit:"EA", unitCost:10580,  defaultQty:2, note:"" },
-    { id:"s7",  name:"Camera Tunnel (5-sided)",                           unit:"EA", unitCost:95130,  defaultQty:1, note:"" },
-    { id:"s8",  name:"In-motion Scale (50 CPM or less, single stage)",    unit:"EA", unitCost:44800,  defaultQty:1, note:"" },
-    { id:"s9",  name:"Right Angle Transfer",                              unit:"EA", unitCost:14900,  defaultQty:4, note:"" },
-    { id:"s10", name:"Pick Zone Routing Transfer (single sided)",         unit:"EA", unitCost:21500,  defaultQty:4, note:"" },
-    { id:"s11", name:"Pick Zone Routing Transfer (double sided)",         unit:"EA", unitCost:62100,  defaultQty:2, note:"" },
-    { id:"s12", name:"Hi-speed Wheel Divert Per Divert w/Spur",          unit:"EA", unitCost:30600,  defaultQty:4, note:"" },
+    { id:"s1",  name:"Induction Belt",                                    unit:"EA", unitCost:36300,  defaultQty:1,  note:"" },
+    { id:"s2",  name:"Line Scanner (single side)",                        unit:"EA", unitCost:10600,  defaultQty:2,  note:"" },
+    { id:"s3",  name:"Omni Scanner (2-sided)",                            unit:"EA", unitCost:22100,  defaultQty:2,  note:"" },
+    { id:"s4",  name:"Scanner Tunnel (5-sided)",                          unit:"EA", unitCost:95130,  defaultQty:1,  note:"" },
+    { id:"s5",  name:"Periscope Scanner",                                 unit:"EA", unitCost:12500,  defaultQty:2,  note:"" },
+    { id:"s6",  name:"Camera Scanner (single side)",                      unit:"EA", unitCost:10580,  defaultQty:2,  note:"" },
+    { id:"s7",  name:"Camera Tunnel (5-sided)",                           unit:"EA", unitCost:95130,  defaultQty:1,  note:"" },
+    { id:"s8",  name:"In-motion Scale (50 CPM or less, single stage)",    unit:"EA", unitCost:44800,  defaultQty:1,  note:"" },
+    { id:"s9",  name:"Right Angle Transfer",                              unit:"EA", unitCost:14900,  defaultQty:4,  note:"" },
+    { id:"s10", name:"Pick Zone Routing Transfer (single sided)",         unit:"EA", unitCost:21500,  defaultQty:4,  note:"" },
+    { id:"s11", name:"Pick Zone Routing Transfer (double sided)",         unit:"EA", unitCost:62100,  defaultQty:2,  note:"" },
+    { id:"s12", name:"Hi-speed Wheel Divert Per Divert w/Spur",          unit:"EA", unitCost:30600,  defaultQty:4,  note:"" },
     { id:"s13", name:"Narrow Belt Sorter (per LF, less diverts/spurs)",  unit:"LF", unitCost:1430,   defaultQty:60, note:"" },
-    { id:"s14", name:"Sliding Shoe Sorter (per divert, single sided)",   unit:"EA", unitCost:68700,  defaultQty:4, note:"" },
-    { id:"s15", name:"Sliding Shoe Sorter (per divert, double sided)",   unit:"EA", unitCost:110000, defaultQty:4, note:"" },
+    { id:"s14", name:"Sliding Shoe Sorter (per divert, single sided)",   unit:"EA", unitCost:68700,  defaultQty:4,  note:"" },
+    { id:"s15", name:"Sliding Shoe Sorter (per divert, double sided)",   unit:"EA", unitCost:110000, defaultQty:4,  note:"" },
   ]},
   { category: "Storage Media", icon: "▦", color: "#2EC4B6", items: [
     { id:"r1", name:"Mezzanine",                          unit:"SF",  unitCost:48,  defaultQty:5000, note:"" },
@@ -207,20 +207,14 @@ const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000)
 const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
 const BG="#0D0F14",BGDEEP="#090B0F",BGCARD="#0F1218",BGROW="#141820",BORDER="#1C2030",BORDER2="#252830",TEXT="#DDD9D0",TEXTDIM="#AAA69E",MUTE="#5A5850",FADE="#4A4E5A",ACCENT="#FF6B35",GOLD="#FFBF00";
 
-// ── Lookup map for catalog items by id ───────────────────────────────────
 const ITEM_MAP = {};
 const CAT_MAP = {};
-CATALOG.forEach(cat => cat.items.forEach(item => {
-  ITEM_MAP[item.id] = item;
-  CAT_MAP[item.id] = cat;
-}));
+CATALOG.forEach(cat => cat.items.forEach(item => { ITEM_MAP[item.id] = item; CAT_MAP[item.id] = cat; }));
 
 function App() {
   const containerRef = useRef(null);
   const [width, setWidth] = useState(900);
   const [mobileTab, setMobileTab] = useState("catalog");
-
-  // ── lines: array of { instanceId, itemId, qty, raw, label }
   const [lines, setLines] = useState([]);
   const [expanded, setExpanded] = useState({"Conveyor":true});
   const [contingency, setContingency] = useState(15);
@@ -235,6 +229,8 @@ function App() {
   const [saveUser, setSaveUser] = useState("");
   const [savedQuotes, setSavedQuotes] = useState([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [editingQuoteId, setEditingQuoteId] = useState(null); // tracks which saved quote is being edited
+  const [showLoadConfirm, setShowLoadConfirm] = useState(null); // quote to confirm loading
   const instanceCounter = useRef(0);
 
   useEffect(() => {
@@ -251,116 +247,134 @@ function App() {
 
   const mobile = width < 680;
 
-  // ── Add a new instance of an item ────────────────────────────────────────
   const addItem = (item) => {
     instanceCounter.current += 1;
-    setLines(prev => [...prev, {
-      instanceId: `${item.id}_${instanceCounter.current}`,
-      itemId: item.id,
-      qty: item.defaultQty,
-      raw: String(item.defaultQty),
-      label: "",
-    }]);
+    setLines(prev => [...prev, { instanceId:`${item.id}_${instanceCounter.current}`, itemId:item.id, qty:item.defaultQty, raw:String(item.defaultQty), label:"" }]);
   };
 
   const removeInstance = (instanceId) => setLines(prev => prev.filter(l => l.instanceId !== instanceId));
-
-  const updateQtyRaw = (instanceId, raw) => setLines(prev => prev.map(l => l.instanceId === instanceId ? {...l, raw} : l));
-
+  const updateQtyRaw = (instanceId, raw) => setLines(prev => prev.map(l => l.instanceId===instanceId ? {...l,raw} : l));
   const commitQty = (instanceId) => setLines(prev => prev.map(l => {
-    if (l.instanceId !== instanceId) return l;
-    const n = parseFloat(l.raw);
-    const qty = (!isNaN(n) && n >= 0) ? n : l.qty;
-    return {...l, qty, raw: String(qty)};
+    if (l.instanceId!==instanceId) return l;
+    const n=parseFloat(l.raw); const qty=(!isNaN(n)&&n>=0)?n:l.qty;
+    return {...l,qty,raw:String(qty)};
   }));
+  const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId===instanceId ? {...l,label} : l));
 
-  const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId === instanceId ? {...l, label} : l));
+  // ── Load a saved quote into the builder ───────────────────────────────────
+  const loadQuote = (quote) => {
+    instanceCounter.current += 1000;
+    const base = instanceCounter.current;
+    const restoredLines = quote.lines
+      .filter(l => ITEM_MAP[l.itemId])
+      .map((l, i) => ({
+        instanceId: `${l.itemId}_${base + i}`,
+        itemId: l.itemId,
+        qty: l.qty,
+        raw: String(l.qty),
+        label: l.label || "",
+      }));
+    setLines(restoredLines);
+    setProjName(quote.projectName);
+    setSaveCustomer(quote.customer);
+    setSaveUser(quote.user);
+    setFreightPct(quote.freightPct || 5);
+    setContingency(quote.contingency || 15);
+    setMarginPct(quote.marginPct || 30);
+    setSoftwareBudget(quote.softwareBudget || 0);
+    setSoftwareRaw(quote.softwareBudget > 0 ? quote.softwareBudget.toLocaleString() : "");
+    setEditingQuoteId(quote.id);
+    setShowLoadConfirm(null);
+    setMobileTab("budget");
+  };
 
-  // ── Computed lines with subtotals ────────────────────────────────────────
   const computedLines = useMemo(() => {
     return lines.map(l => {
       const item = ITEM_MAP[l.itemId];
       const cat = CAT_MAP[l.itemId];
-      const subtotal = item.unit === "%" ? 0 : l.qty * item.unitCost;
-      return { ...l, item, cat, subtotal };
+      const subtotal = item.unit==="%" ? 0 : l.qty * item.unitCost;
+      return {...l, item, cat, subtotal};
     });
   }, [lines]);
 
-  const equipTotal = computedLines.reduce((s, l) => s + l.subtotal, 0);
+  const equipTotal = computedLines.reduce((s,l) => s+l.subtotal, 0);
   const subWithSW  = equipTotal + softwareBudget;
-  const freightAmt = subWithSW * (freightPct / 100);
-  const contAmt    = (subWithSW + freightAmt) * (contingency / 100);
+  const freightAmt = subWithSW * (freightPct/100);
+  const contAmt    = (subWithSW+freightAmt) * (contingency/100);
   const grand      = subWithSW + freightAmt + contAmt;
-  const marginAmt  = grand * (marginPct / 100);
+  const marginAmt  = grand * (marginPct/100);
   const costBasis  = grand - marginAmt;
   const selCount   = lines.length;
 
-  // Count instances per catalog item for badge
   const instanceCount = {};
-  lines.forEach(l => { instanceCount[l.itemId] = (instanceCount[l.itemId] || 0) + 1; });
+  lines.forEach(l => { instanceCount[l.itemId] = (instanceCount[l.itemId]||0)+1; });
+
+  const clearBuilder = () => {
+    setLines([]); setProjName("New Project"); setSaveCustomer(""); setSaveUser("");
+    setFreightPct(5); setContingency(15); setMarginPct(30);
+    setSoftwareBudget(0); setSoftwareRaw(""); setEditingQuoteId(null);
+  };
 
   const doSaveQuote = async () => {
     const quote = {
-      id: Date.now(),
-      date: new Date().toLocaleDateString("en-US", {year:"numeric",month:"short",day:"numeric"}),
-      projectName: projName, customer: saveCustomer, user: saveUser,
-      lines: computedLines.map(l => ({
-        instanceId: l.instanceId, itemId: l.itemId, name: l.item.name,
-        label: l.label, category: l.cat.category, unit: l.item.unit,
-        unitCost: l.item.unitCost, qty: l.qty, subtotal: l.subtotal,
-      })),
+      id: editingQuoteId || Date.now(),
+      date: new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}),
+      projectName:projName, customer:saveCustomer, user:saveUser,
+      lines: computedLines.map(l => ({ instanceId:l.instanceId, itemId:l.itemId, name:l.item.name, label:l.label, category:l.cat.category, unit:l.item.unit, unitCost:l.item.unitCost, qty:l.qty, subtotal:l.subtotal })),
       equipTotal, softwareBudget, subWithSW, freightAmt, freightPct, contAmt, contingency, grand, marginAmt, marginPct, costBasis,
     };
-    const updated = [quote, ...savedQuotes];
+    // Replace if editing, prepend if new
+    const updated = editingQuoteId
+      ? savedQuotes.map(q => q.id===editingQuoteId ? quote : q)
+      : [quote, ...savedQuotes];
     setSavedQuotes(updated);
     try { await storage.set("savedQuotes", JSON.stringify(updated)); } catch(e) {}
-    setShowSaveModal(false); setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000);
+    setShowSaveModal(false); setSaveSuccess(true); setTimeout(()=>setSaveSuccess(false),3000);
+    setEditingQuoteId(quote.id);
   };
 
   const deleteQuote = async (id) => {
-    const updated = savedQuotes.filter(q => q.id !== id);
+    const updated = savedQuotes.filter(q => q.id!==id);
     setSavedQuotes(updated);
     try { await storage.set("savedQuotes", JSON.stringify(updated)); } catch(e) {}
+    if (editingQuoteId===id) { setEditingQuoteId(null); }
   };
 
   const downloadExcel = (quote) => {
-    const XLSX = window.XLSX; if (!XLSX) { alert("Excel library not loaded yet."); return; }
-    const wb = XLSX.utils.book_new();
-    const summaryData = [
-      ["RULE OF THUMB BUDGET TOOL"], ["Budgetary Estimate — For Planning Purposes Only"], [],
-      ["Project", quote.projectName], ["Customer", quote.customer], ["Prepared By", quote.user], ["Date", quote.date], [],
-      ["CATEGORY", "ITEM", "DESCRIPTION/LABEL", "UNIT", "UNIT PRICE", "QTY", "SUBTOTAL"],
+    const XLSX=window.XLSX; if (!XLSX){alert("Excel library not loaded yet.");return;}
+    const wb=XLSX.utils.book_new();
+    const summaryData=[
+      ["RULE OF THUMB BUDGET TOOL"],["ROM Estimate — For Planning Purposes Only"],[],
+      ["Project",quote.projectName],["Customer",quote.customer],["Prepared By",quote.user],["Date",quote.date],[],
+      ["CATEGORY","ITEM","DESCRIPTION/LABEL","UNIT","UNIT PRICE","QTY","SUBTOTAL"],
     ];
-    const byCategory = {};
-    quote.lines.forEach(l => { if (!byCategory[l.category]) byCategory[l.category] = []; byCategory[l.category].push(l); });
-    Object.entries(byCategory).forEach(([cat, items]) => {
-      const catTotal = items.reduce((s, i) => s + i.subtotal, 0);
-      items.forEach((l, idx) => summaryData.push([idx===0?cat:"", l.name, l.label||"", l.unit, l.unitCost, l.qty, l.subtotal]));
-      summaryData.push(["", `${cat} Subtotal`, "", "", "", "", catTotal]);
+    const byCategory={};
+    quote.lines.forEach(l=>{if(!byCategory[l.category])byCategory[l.category]=[];byCategory[l.category].push(l);});
+    Object.entries(byCategory).forEach(([cat,items])=>{
+      const catTotal=items.reduce((s,i)=>s+i.subtotal,0);
+      items.forEach((l,idx)=>summaryData.push([idx===0?cat:"",l.name,l.label||"",l.unit,l.unitCost,l.qty,l.subtotal]));
+      summaryData.push(["",`${cat} Subtotal`,"","","","",catTotal]);
       summaryData.push([]);
     });
     summaryData.push(["BUDGET SUMMARY"]);
-    summaryData.push(["Turnkey Subtotal", "", "", "", "", "", quote.equipTotal]);
-    if (quote.softwareBudget > 0) {
-      summaryData.push(["Software Budget", "", "", "", "", "", quote.softwareBudget]);
-      summaryData.push(["Combined Subtotal", "", "", "", "", "", quote.subWithSW]);
-    }
-    summaryData.push([`Freight & Rigging (${quote.freightPct}%)`, "", "", "", "", "", quote.freightAmt]);
-    summaryData.push([`Contingency (${quote.contingency}%)`, "", "", "", "", "", quote.contAmt]);
-    summaryData.push(["TOTAL TURNKEY ESTIMATE", "", "", "", "", "", quote.grand]);
+    summaryData.push(["Turnkey Subtotal","","","","","",quote.equipTotal]);
+    if(quote.softwareBudget>0){summaryData.push(["Software Budget","","","","","",quote.softwareBudget]);summaryData.push(["Combined Subtotal","","","","","",quote.subWithSW]);}
+    summaryData.push([`Freight & Rigging (${quote.freightPct}%)`,"","","","","",quote.freightAmt]);
+    summaryData.push([`Contingency (${quote.contingency}%)`,"","","","","",quote.contAmt]);
+    summaryData.push(["TOTAL TURNKEY ESTIMATE","","","","","",quote.grand]);
     summaryData.push([]);
-    summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`, "", "", "", "", "", quote.marginAmt]);
-    summaryData.push(["Cost Basis", "", "", "", "", "", quote.costBasis]);
+    summaryData.push([`Estimated Margin (${quote.marginPct}% GP)`,"","","","","",quote.marginAmt]);
+    summaryData.push(["Cost Basis","","","","","",quote.costBasis]);
     summaryData.push([]);
     summaryData.push(["DISCLAIMER: All prices are turnkey ROM estimates ±20%. For planning purposes only — not a formal quotation."]);
-    const ws = XLSX.utils.aoa_to_sheet(summaryData);
-    ws["!cols"] = [{wch:28},{wch:44},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
-    XLSX.utils.book_append_sheet(wb, ws, "Quote");
-    const indexData = [["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
-    const ws2 = XLSX.utils.aoa_to_sheet(indexData);
-    ws2["!cols"] = [{wch:14},{wch:26},{wch:24},{wch:20},{wch:16}];
-    XLSX.utils.book_append_sheet(wb, ws2, "Saved Quotes");
-    XLSX.writeFile(wb, `${quote.projectName.replace(/[^a-zA-Z0-9_-]/g,"_")}_${quote.date.replace(/\s/g,"_")}.xlsx`);
+    const ws=XLSX.utils.aoa_to_sheet(summaryData);
+    ws["!cols"]=[{wch:28},{wch:44},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws,"Quote");
+    const indexData=[["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
+    const ws2=XLSX.utils.aoa_to_sheet(indexData);
+    ws2["!cols"]=[{wch:14},{wch:26},{wch:24},{wch:20},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws2,"Saved Quotes");
+    XLSX.writeFile(wb,`${quote.projectName.replace(/[^a-zA-Z0-9_-]/g,"_")}_${quote.date.replace(/\s/g,"_")}.xlsx`);
   };
 
   const nameEditor = (small) => editingName ? (
@@ -377,9 +391,9 @@ function App() {
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>EQUIPMENT & SERVICES CATALOG</div>
         <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Click + to add · add same item multiple times</div>
       </div>
-      {CATALOG.map(cat => {
-        const addedN = cat.items.reduce((s,i) => s + (instanceCount[i.id]||0), 0);
-        const open = !!expanded[cat.category];
+      {CATALOG.map(cat=>{
+        const addedN=cat.items.reduce((s,i)=>s+(instanceCount[i.id]||0),0);
+        const open=!!expanded[cat.category];
         return (
           <div key={cat.category} style={{borderBottom:`1px solid ${BORDER}`}}>
             <div onClick={e=>{e.preventDefault();setExpanded(p=>({...p,[cat.category]:!p[cat.category]}));}}
@@ -391,27 +405,18 @@ function App() {
               </div>
               <span style={{color:FADE,fontSize:"10px",flexShrink:0,marginLeft:"6px"}}>{open?"▲":"▼"}</span>
             </div>
-            {open && cat.items.map(item => {
-              const count = instanceCount[item.id] || 0;
+            {open&&cat.items.map(item=>{
+              const count=instanceCount[item.id]||0;
               return (
                 <div key={item.id} style={{padding:"9px 14px 9px 28px",background:count>0?cat.color+"0D":"transparent",borderLeft:count>0?`3px solid ${cat.color}`:"3px solid transparent",borderBottom:`1px solid ${BGROW}`}}>
                   <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
                     <button onClick={()=>addItem(item)}
-                      style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:BGDEEP,cursor:"pointer",fontWeight:"bold",lineHeight:1}}>
-                      +
-                    </button>
+                      style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:BGDEEP,cursor:"pointer",fontWeight:"bold",lineHeight:1}}>+</button>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:"13px",color:count>0?TEXT:TEXTDIM,lineHeight:1.3}}>{item.name}</div>
-                      <div style={{fontSize:"11px",color:count>0?cat.color:FADE,marginTop:"2px"}}>
-                        {`${fmt(item.unitCost)} / ${item.unit}`}
-                        {item.note?` · ${item.note}`:""}
-                      </div>
+                      <div style={{fontSize:"11px",color:count>0?cat.color:FADE,marginTop:"2px"}}>{`${fmt(item.unitCost)} / ${item.unit}`}{item.note?` · ${item.note}`:""}</div>
                     </div>
-                    {count>0&&(
-                      <span style={{fontSize:"11px",color:cat.color,background:cat.color+"20",border:`1px solid ${cat.color}40`,borderRadius:"10px",padding:"2px 8px",flexShrink:0}}>
-                        ×{count}
-                      </span>
-                    )}
+                    {count>0&&<span style={{fontSize:"11px",color:cat.color,background:cat.color+"20",border:`1px solid ${cat.color}40`,borderRadius:"10px",padding:"2px 8px",flexShrink:0}}>×{count}</span>}
                   </div>
                 </div>
               );
@@ -433,34 +438,38 @@ function App() {
         </div>
       ):(
         <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
+
+          {/* Editing banner */}
+          {editingQuoteId&&(
+            <div style={{marginBottom:"14px",padding:"9px 12px",background:"rgba(255,191,0,0.07)",border:"1px solid rgba(255,191,0,0.3)",borderRadius:"5px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
+              <div style={{fontSize:"11px",color:GOLD}}>✎ Editing saved quote — save to update, or clear to start fresh</div>
+              <button onClick={clearBuilder} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"3px 8px",cursor:"pointer",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}}>✕ Clear</button>
+            </div>
+          )}
+
           <div style={{marginBottom:"16px"}}>
-            <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGETARY ESTIMATE</div>
+            <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>ROM ESTIMATE</div>
             <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
-            <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% budgetary</div>
+            <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% estimate</div>
           </div>
 
-          {CATALOG.map(cat => {
-            const catLines = computedLines.filter(l => l.cat.category === cat.category);
-            if (!catLines.length) return null;
-            const catTotal = catLines.reduce((s,l) => s+l.subtotal, 0);
+          {CATALOG.map(cat=>{
+            const catLines=computedLines.filter(l=>l.cat.category===cat.category);
+            if(!catLines.length)return null;
+            const catTotal=catLines.reduce((s,l)=>s+l.subtotal,0);
             return (
               <div key={cat.category} style={{marginBottom:"18px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:cat.color+"12",borderLeft:`3px solid ${cat.color}`,borderRadius:"0 4px 4px 0",marginBottom:"2px"}}>
                   <span style={{fontSize:"11px",letterSpacing:"0.1em",color:cat.color}}>{cat.icon} {cat.category.toUpperCase()}</span>
                   <span style={{fontSize:"13px",color:cat.color,fontStyle:"italic"}}>{fmtFull(catTotal)}</span>
                 </div>
-                {catLines.map(line => (
+                {catLines.map(line=>(
                   <div key={line.instanceId} style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:"13px",color:TEXT,lineHeight:1.3}}>{line.item.name}</div>
-                        {/* Editable label */}
-                        <input
-                          value={line.label}
-                          onChange={e=>updateLabel(line.instanceId, e.target.value)}
-                          placeholder="Add description (e.g. Receiving zone)..."
-                          style={{marginTop:"4px",width:"100%",background:"transparent",border:"none",borderBottom:`1px dashed ${BORDER}`,color:TEXTDIM,fontSize:"11px",fontFamily:"Georgia,serif",outline:"none",padding:"2px 0"}}
-                        />
+                        <input value={line.label} onChange={e=>updateLabel(line.instanceId,e.target.value)} placeholder="Add description (e.g. Receiving zone)..."
+                          style={{marginTop:"4px",width:"100%",background:"transparent",border:"none",borderBottom:`1px dashed ${BORDER}`,color:TEXTDIM,fontSize:"11px",fontFamily:"Georgia,serif",outline:"none",padding:"2px 0"}} />
                       </div>
                       <button onClick={()=>removeInstance(line.instanceId)} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",width:"24px",height:"24px",flexShrink:0,cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
                     </div>
@@ -479,7 +488,7 @@ function App() {
             );
           })}
 
-          {/* Summary block */}
+          {/* Summary */}
           <div style={{marginTop:"20px",background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
             <div style={{padding:"10px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGET SUMMARY</div>
@@ -557,7 +566,7 @@ function App() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"15px 14px",background:"linear-gradient(135deg,rgba(255,107,53,0.08),rgba(255,191,0,0.05))"}}>
               <div>
                 <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE}}>TOTAL TURNKEY ESTIMATE</div>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>±20% ROM · includes freight & contingency</div>
+                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>ROM ±20% · includes freight & contingency</div>
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:mobile?"22px":"26px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</div>
@@ -568,13 +577,19 @@ function App() {
 
           <div style={{marginTop:"16px",display:"flex",gap:"10px"}}>
             <button onClick={()=>setShowSaveModal(true)}
-              style={{flex:1,padding:"12px",background:"rgba(255,107,53,0.15)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-              💾 SAVE QUOTE
+              style={{flex:1,padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.15)":"rgba(255,107,53,0.15)",border:editingQuoteId?"1px solid rgba(255,191,0,0.5)":"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+              {editingQuoteId ? "💾 UPDATE QUOTE" : "💾 SAVE QUOTE"}
             </button>
+            {editingQuoteId&&(
+              <button onClick={clearBuilder}
+                style={{padding:"12px 16px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"5px",color:FADE,fontSize:"13px",cursor:"pointer",fontFamily:"Georgia,serif"}}>
+                ✕ Clear
+              </button>
+            )}
           </div>
-          {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ Quote saved successfully</div>}
+          {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"Quote saved"} successfully</div>}
           <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All prices are turnkey ROM estimates including equipment, installation labor, commissioning, engineering, and integrator margin. Freight is estimated separately. Total carries a ±20% variance. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
+            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All prices are turnkey ROM estimates ±20% including equipment, installation labor, commissioning, engineering, and integrator margin. Freight is estimated separately. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
           </div>
         </div>
       )}
@@ -586,7 +601,7 @@ function App() {
     <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>SAVED QUOTES</div>
-        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>{savedQuotes.length} saved · click to download Excel</div>
+        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>{savedQuotes.length} saved</div>
       </div>
       {savedQuotes.length===0?(
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"200px",gap:"10px",color:FADE,padding:"32px 20px",textAlign:"center"}}>
@@ -595,7 +610,10 @@ function App() {
           <div style={{fontSize:"12px"}}>Build a budget and click Save Quote</div>
         </div>
       ):savedQuotes.map(q=>(
-        <div key={q.id} style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,background:BGCARD}}>
+        <div key={q.id} style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,background:editingQuoteId===q.id?"rgba(255,191,0,0.04)":BGCARD,borderLeft:editingQuoteId===q.id?`3px solid ${GOLD}`:"3px solid transparent"}}>
+          {editingQuoteId===q.id&&(
+            <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.1em",marginBottom:"6px"}}>✎ CURRENTLY EDITING</div>
+          )}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic"}}>{q.projectName}</div>
@@ -608,24 +626,51 @@ function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
+            <button onClick={()=>{
+                if (lines.length>0 && editingQuoteId!==q.id) { setShowLoadConfirm(q); }
+                else { loadQuote(q); }
+              }}
+              style={{flex:1,padding:"7px 10px",background:editingQuoteId===q.id?"rgba(255,191,0,0.1)":"rgba(255,107,53,0.1)",border:editingQuoteId===q.id?"1px solid rgba(255,191,0,0.4)":"1px solid rgba(255,107,53,0.4)",borderRadius:"4px",color:editingQuoteId===q.id?GOLD:ACCENT,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
+              {editingQuoteId===q.id ? "✎ EDITING" : "✎ LOAD & EDIT"}
+            </button>
             <button onClick={()=>downloadExcel(q)}
               style={{flex:1,padding:"7px 10px",background:"rgba(46,196,182,0.1)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
-              ⬇ DOWNLOAD EXCEL
+              ⬇ EXCEL
             </button>
             <button onClick={()=>deleteQuote(q.id)}
               style={{padding:"7px 10px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"4px",color:FADE,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
           </div>
         </div>
       ))}
+
+      {/* Load confirmation modal */}
+      {showLoadConfirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
+          <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
+            <div style={{fontSize:"14px",color:TEXT,marginBottom:"8px"}}>Load <span style={{color:ACCENT,fontStyle:"italic"}}>{showLoadConfirm.projectName}</span>?</div>
+            <div style={{fontSize:"12px",color:FADE,marginBottom:"20px"}}>Your current unsaved work will be replaced.</div>
+            <div style={{display:"flex",gap:"10px"}}>
+              <button onClick={()=>loadQuote(showLoadConfirm)}
+                style={{flex:1,padding:"10px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"4px",color:ACCENT,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+                Load Quote
+              </button>
+              <button onClick={()=>setShowLoadConfirm(null)}
+                style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
   // ── Save Modal ────────────────────────────────────────────────────────────
-  const saveModal = showSaveModal && (
+  const saveModal = showSaveModal&&(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
       <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"400px",overflow:"hidden"}}>
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${BORDER}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:"13px",letterSpacing:"0.1em",color:MUTE}}>SAVE QUOTE</div>
+          <div style={{fontSize:"13px",letterSpacing:"0.1em",color:MUTE}}>{editingQuoteId?"UPDATE QUOTE":"SAVE QUOTE"}</div>
           <button onClick={()=>setShowSaveModal(false)} style={{background:"transparent",border:"none",color:FADE,fontSize:"16px",cursor:"pointer"}}>✕</button>
         </div>
         <div style={{padding:"20px"}}>
@@ -644,8 +689,8 @@ function App() {
             <div style={{fontSize:"10px",color:FADE,marginTop:"3px"}}>{selCount} line items · {new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"})}</div>
           </div>
           <button onClick={doSaveQuote}
-            style={{width:"100%",padding:"12px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.6)",borderRadius:"5px",color:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-            SAVE QUOTE
+            style={{width:"100%",padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.2)":"rgba(255,107,53,0.2)",border:editingQuoteId?"1px solid rgba(255,191,0,0.6)":"1px solid rgba(255,107,53,0.6)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+            {editingQuoteId?"UPDATE QUOTE":"SAVE QUOTE"}
           </button>
         </div>
       </div>
@@ -676,8 +721,7 @@ function App() {
       {mobile?(
         <>
           <div style={{display:"flex",alignItems:"center",gap:"6px",padding:"7px 14px",borderBottom:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0}}>
-            {nameEditor(true)}
-            <span style={{fontSize:"10px",color:FADE}}>✎</span>
+            {nameEditor(true)}<span style={{fontSize:"10px",color:FADE}}>✎</span>
           </div>
           <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
             {mobileTab==="catalog"?catalogPanel:mobileTab==="budget"?budgetPanel:savedPanel}
@@ -693,15 +737,9 @@ function App() {
         </>
       ):(
         <div style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
-          <div style={{width:"380px",flexShrink:0,borderRight:`1px solid ${BORDER}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-            {catalogPanel}
-          </div>
-          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",borderRight:`1px solid ${BORDER}`}}>
-            {budgetPanel}
-          </div>
-          <div style={{width:"320px",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-            {savedPanel}
-          </div>
+          <div style={{width:"380px",flexShrink:0,borderRight:`1px solid ${BORDER}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>{catalogPanel}</div>
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",borderRight:`1px solid ${BORDER}`}}>{budgetPanel}</div>
+          <div style={{width:"320px",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>{savedPanel}</div>
         </div>
       )}
     </div>
