@@ -201,6 +201,11 @@ const CATALOG = [
     { id:"pm9",  name:"Stair Tower 2-level",                unit:"EA",  unitCost:15300,  defaultQty:2,    note:"" },
     { id:"pm10", name:"Stair Tower 3-level",                unit:"EA",  unitCost:22800,  defaultQty:1,    note:"" },
   ]},
+  { category: "Demolition & Site Prep", icon: "⚒", color: "#A8855A", items: [
+    { id:"d1", name:"Powered Conveyor Demo",                          unit:"LF",  unitCost:90,  defaultQty:100, note:"" },
+    { id:"d2", name:"Gravity Conveyor Demo",                          unit:"LF",  unitCost:50,  defaultQty:100, note:"" },
+    { id:"d3", name:"Rack Bay Demo (4'×8', 5 beam levels)",           unit:"Bay", unitCost:130, defaultQty:50,  note:"Per bay" },
+  ]},
 ];
 
 const BASE_MARGIN_PCT = 21;
@@ -238,7 +243,6 @@ function App() {
   const [editingQuoteId, setEditingQuoteId] = useState(null);
   const [showLoadConfirm, setShowLoadConfirm] = useState(null);
 
-  // ── Custom item form state ────────────────────────────────────────────────
   const [customName, setCustomName]   = useState("");
   const [customUnit, setCustomUnit]   = useState("EA");
   const [customCost, setCustomCost]   = useState("");
@@ -266,30 +270,18 @@ function App() {
     setLines(prev => [...prev, { instanceId:`${item.id}_${instanceCounter.current}`, itemId:item.id, qty:item.defaultQty, raw:String(item.defaultQty), label:"", isCustom:false }]);
   };
 
-  // ── Add a one-off custom item directly to lines ───────────────────────────
   const addCustomItem = () => {
     const name = customName.trim();
     const cost = parseFloat(customCost.replace(/,/g,""));
     const qty  = parseFloat(customQty);
-    if (!name)          { setCustomError("Please enter an item name."); return; }
-    if (isNaN(cost) || cost < 0) { setCustomError("Please enter a valid unit price."); return; }
-    if (isNaN(qty)  || qty  < 0) { setCustomError("Please enter a valid quantity."); return; }
+    if (!name)               { setCustomError("Please enter an item name."); return; }
+    if (isNaN(cost)||cost<0) { setCustomError("Please enter a valid unit price."); return; }
+    if (isNaN(qty)||qty<0)   { setCustomError("Please enter a valid quantity."); return; }
     setCustomError("");
     instanceCounter.current += 1;
     const instanceId = `custom_${instanceCounter.current}`;
-    setLines(prev => [...prev, {
-      instanceId,
-      itemId: instanceId,       // unique — not in ITEM_MAP
-      qty,
-      raw: String(qty),
-      label: "",
-      isCustom: true,
-      customName: name,
-      customUnit: customUnit,
-      customCost: cost,
-    }]);
-    // Reset form but keep unit for convenience
-    setCustomName(""); setCustomCost(""); setCustomQty("1"); setCustomError("");
+    setLines(prev => [...prev, { instanceId, itemId:instanceId, qty, raw:String(qty), label:"", isCustom:true, customName:name, customUnit:customUnit, customCost:cost }]);
+    setCustomName(""); setCustomCost(""); setCustomQty("1");
   };
 
   const removeInstance  = (instanceId) => setLines(prev => prev.filter(l => l.instanceId!==instanceId));
@@ -305,9 +297,7 @@ function App() {
     instanceCounter.current += 1000;
     const base = instanceCounter.current;
     setLines((quote.lines||[]).map((l,i) => {
-      if (l.isCustom) {
-        return { instanceId:`custom_${base+i}`, itemId:`custom_${base+i}`, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:true, customName:l.customName, customUnit:l.customUnit, customCost:l.customCost };
-      }
+      if (l.isCustom) return { instanceId:`custom_${base+i}`, itemId:`custom_${base+i}`, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:true, customName:l.customName, customUnit:l.customUnit, customCost:l.customCost };
       if (!ITEM_MAP[l.itemId]) return null;
       return { instanceId:`${l.itemId}_${base+i}`, itemId:l.itemId, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:false };
     }).filter(Boolean));
@@ -325,9 +315,7 @@ function App() {
   };
 
   const computedLines = useMemo(() => lines.map(l => {
-    if (l.isCustom) {
-      return { ...l, item:{ name:l.customName, unit:l.customUnit, unitCost:l.customCost, note:"" }, cat:{ category:CUSTOM_CATEGORY, color:CUSTOM_COLOR }, subtotal:l.qty*l.customCost };
-    }
+    if (l.isCustom) return { ...l, item:{ name:l.customName, unit:l.customUnit, unitCost:l.customCost, note:"" }, cat:{ category:CUSTOM_CATEGORY, color:CUSTOM_COLOR }, subtotal:l.qty*l.customCost };
     const item=ITEM_MAP[l.itemId]; const cat=CAT_MAP[l.itemId];
     return {...l, item, cat, subtotal:l.qty*item.unitCost};
   }), [lines]);
@@ -356,9 +344,8 @@ function App() {
       date: new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}),
       projectName:projName, customer:saveCustomer, user:saveUser,
       lines: computedLines.map(l=>({
-        instanceId:l.instanceId, itemId:l.itemId,
-        name:l.item.name, label:l.label, category:l.cat.category,
-        unit:l.item.unit, unitCost:l.item.unitCost, qty:l.qty, subtotal:l.subtotal,
+        instanceId:l.instanceId, itemId:l.itemId, name:l.item.name, label:l.label,
+        category:l.cat.category, unit:l.item.unit, unitCost:l.item.unitCost, qty:l.qty, subtotal:l.subtotal,
         isCustom:l.isCustom||false,
         ...(l.isCustom?{customName:l.customName,customUnit:l.customUnit,customCost:l.customCost}:{}),
       })),
@@ -485,15 +472,12 @@ function App() {
             <div style={{fontSize:"11px",color:TEXTDIM,marginBottom:"12px",lineHeight:1.5}}>
               Enter any item not in the catalog — equipment, services, allowances, etc. Price you enter is used as-is.
             </div>
-            {/* Name */}
             <div style={{marginBottom:"10px"}}>
               <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>ITEM NAME</div>
-              <input value={customName} onChange={e=>setCustomName(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
+              <input value={customName} onChange={e=>setCustomName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
                 placeholder="e.g. Dock Levelers, Site Electrical Allowance..."
                 style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
             </div>
-            {/* Unit + Cost row */}
             <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
               <div style={{flex:"0 0 80px"}}>
                 <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>UNIT</div>
@@ -504,18 +488,14 @@ function App() {
               </div>
               <div style={{flex:1}}>
                 <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>UNIT PRICE ($)</div>
-                <input value={customCost} onChange={e=>setCustomCost(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
-                  placeholder="0"
-                  inputMode="decimal"
+                <input value={customCost} onChange={e=>setCustomCost(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
+                  placeholder="0" inputMode="decimal"
                   style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
               </div>
               <div style={{flex:"0 0 72px"}}>
                 <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>QTY</div>
-                <input value={customQty} onChange={e=>setCustomQty(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
-                  placeholder="1"
-                  inputMode="decimal"
+                <input value={customQty} onChange={e=>setCustomQty(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
+                  placeholder="1" inputMode="decimal"
                   style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
               </div>
             </div>
@@ -553,7 +533,6 @@ function App() {
             <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% estimate</div>
           </div>
 
-          {/* Catalog categories */}
           {CATALOG.map(cat=>{
             const catLines=computedLines.filter(l=>!l.isCustom&&l.cat.category===cat.category);
             if(!catLines.length)return null;
@@ -589,7 +568,6 @@ function App() {
             );
           })}
 
-          {/* Custom items section in budget */}
           {computedLines.filter(l=>l.isCustom).length>0&&(
             <div style={{marginBottom:"18px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:CUSTOM_COLOR+"12",borderLeft:`3px solid ${CUSTOM_COLOR}`,borderRadius:"0 4px 4px 0",marginBottom:"2px"}}>
