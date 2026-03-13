@@ -203,17 +203,19 @@ const CATALOG = [
   ]},
 ];
 
-// ── Baked-in rate assumptions ─────────────────────────────────────────────
-const BASE_MARGIN_PCT   = 21;  // already baked into catalog unit prices
-const BASE_CONT_PCT     = 3;   // already baked into catalog unit prices
+const BASE_MARGIN_PCT = 21;
+const BASE_CONT_PCT   = 3;
 
 const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
 const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
 const BG="#0D0F14",BGDEEP="#090B0F",BGCARD="#0F1218",BGROW="#141820",BORDER="#1C2030",BORDER2="#252830",TEXT="#DDD9D0",TEXTDIM="#AAA69E",MUTE="#5A5850",FADE="#4A4E5A",ACCENT="#FF6B35",GOLD="#FFBF00";
+const CUSTOM_COLOR = "#7EB8F7";
 
 const ITEM_MAP = {};
-const CAT_MAP = {};
+const CAT_MAP  = {};
 CATALOG.forEach(cat => cat.items.forEach(item => { ITEM_MAP[item.id] = item; CAT_MAP[item.id] = cat; }));
+
+const CUSTOM_CATEGORY = "Custom Items";
 
 function App() {
   const containerRef = useRef(null);
@@ -221,7 +223,6 @@ function App() {
   const [mobileTab, setMobileTab] = useState("catalog");
   const [lines, setLines] = useState([]);
   const [expanded, setExpanded] = useState({"Conveyor":true});
-  // Additional margin/contingency ON TOP of what's already baked in
   const [contingency, setContingency]   = useState(0);
   const [freightPct, setFreightPct]     = useState(5);
   const [marginPct, setMarginPct]       = useState(0);
@@ -236,6 +237,14 @@ function App() {
   const [saveSuccess, setSaveSuccess]       = useState(false);
   const [editingQuoteId, setEditingQuoteId] = useState(null);
   const [showLoadConfirm, setShowLoadConfirm] = useState(null);
+
+  // ── Custom item form state ────────────────────────────────────────────────
+  const [customName, setCustomName]   = useState("");
+  const [customUnit, setCustomUnit]   = useState("EA");
+  const [customCost, setCustomCost]   = useState("");
+  const [customQty,  setCustomQty]    = useState("1");
+  const [customError, setCustomError] = useState("");
+
   const instanceCounter = useRef(0);
 
   useEffect(() => {
@@ -254,7 +263,33 @@ function App() {
 
   const addItem = (item) => {
     instanceCounter.current += 1;
-    setLines(prev => [...prev, { instanceId:`${item.id}_${instanceCounter.current}`, itemId:item.id, qty:item.defaultQty, raw:String(item.defaultQty), label:"" }]);
+    setLines(prev => [...prev, { instanceId:`${item.id}_${instanceCounter.current}`, itemId:item.id, qty:item.defaultQty, raw:String(item.defaultQty), label:"", isCustom:false }]);
+  };
+
+  // ── Add a one-off custom item directly to lines ───────────────────────────
+  const addCustomItem = () => {
+    const name = customName.trim();
+    const cost = parseFloat(customCost.replace(/,/g,""));
+    const qty  = parseFloat(customQty);
+    if (!name)          { setCustomError("Please enter an item name."); return; }
+    if (isNaN(cost) || cost < 0) { setCustomError("Please enter a valid unit price."); return; }
+    if (isNaN(qty)  || qty  < 0) { setCustomError("Please enter a valid quantity."); return; }
+    setCustomError("");
+    instanceCounter.current += 1;
+    const instanceId = `custom_${instanceCounter.current}`;
+    setLines(prev => [...prev, {
+      instanceId,
+      itemId: instanceId,       // unique — not in ITEM_MAP
+      qty,
+      raw: String(qty),
+      label: "",
+      isCustom: true,
+      customName: name,
+      customUnit: customUnit,
+      customCost: cost,
+    }]);
+    // Reset form but keep unit for convenience
+    setCustomName(""); setCustomCost(""); setCustomQty("1"); setCustomError("");
   };
 
   const removeInstance  = (instanceId) => setLines(prev => prev.filter(l => l.instanceId!==instanceId));
@@ -269,9 +304,13 @@ function App() {
   const loadQuote = (quote) => {
     instanceCounter.current += 1000;
     const base = instanceCounter.current;
-    setLines(quote.lines.filter(l=>ITEM_MAP[l.itemId]).map((l,i)=>({
-      instanceId:`${l.itemId}_${base+i}`, itemId:l.itemId, qty:l.qty, raw:String(l.qty), label:l.label||"",
-    })));
+    setLines((quote.lines||[]).map((l,i) => {
+      if (l.isCustom) {
+        return { instanceId:`custom_${base+i}`, itemId:`custom_${base+i}`, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:true, customName:l.customName, customUnit:l.customUnit, customCost:l.customCost };
+      }
+      if (!ITEM_MAP[l.itemId]) return null;
+      return { instanceId:`${l.itemId}_${base+i}`, itemId:l.itemId, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:false };
+    }).filter(Boolean));
     setProjName(quote.projectName);
     setSaveCustomer(quote.customer);
     setSaveUser(quote.user);
@@ -286,21 +325,24 @@ function App() {
   };
 
   const computedLines = useMemo(() => lines.map(l => {
+    if (l.isCustom) {
+      return { ...l, item:{ name:l.customName, unit:l.customUnit, unitCost:l.customCost, note:"" }, cat:{ category:CUSTOM_CATEGORY, color:CUSTOM_COLOR }, subtotal:l.qty*l.customCost };
+    }
     const item=ITEM_MAP[l.itemId]; const cat=CAT_MAP[l.itemId];
-    return {...l, item, cat, subtotal: l.qty*item.unitCost};
+    return {...l, item, cat, subtotal:l.qty*item.unitCost};
   }), [lines]);
 
-  const equipTotal  = computedLines.reduce((s,l)=>s+l.subtotal,0);
-  const subWithSW   = equipTotal + softwareBudget;
-  const freightAmt  = subWithSW * (freightPct/100);
-  // Additional margin & contingency on top of baked-in rates
-  const addlContAmt   = (subWithSW + freightAmt) * (contingency/100);
-  const addlMarginAmt = (subWithSW + freightAmt + addlContAmt) * (marginPct/100);
-  const grand       = subWithSW + freightAmt + addlContAmt + addlMarginAmt;
-  const selCount    = lines.length;
+  const equipTotal    = computedLines.reduce((s,l)=>s+l.subtotal,0);
+  const subWithSW     = equipTotal + softwareBudget;
+  const freightAmt    = subWithSW * (freightPct/100);
+  const addlContAmt   = (subWithSW+freightAmt) * (contingency/100);
+  const addlMarginAmt = (subWithSW+freightAmt+addlContAmt) * (marginPct/100);
+  const grand         = subWithSW + freightAmt + addlContAmt + addlMarginAmt;
+  const selCount      = lines.length;
 
   const instanceCount = {};
-  lines.forEach(l => { instanceCount[l.itemId]=(instanceCount[l.itemId]||0)+1; });
+  lines.forEach(l => { if (!l.isCustom) instanceCount[l.itemId]=(instanceCount[l.itemId]||0)+1; });
+  const customLineCount = lines.filter(l=>l.isCustom).length;
 
   const clearBuilder = () => {
     setLines([]); setProjName("New Project"); setSaveCustomer(""); setSaveUser("");
@@ -313,7 +355,13 @@ function App() {
       id: editingQuoteId||Date.now(),
       date: new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}),
       projectName:projName, customer:saveCustomer, user:saveUser,
-      lines: computedLines.map(l=>({instanceId:l.instanceId,itemId:l.itemId,name:l.item.name,label:l.label,category:l.cat.category,unit:l.item.unit,unitCost:l.item.unitCost,qty:l.qty,subtotal:l.subtotal})),
+      lines: computedLines.map(l=>({
+        instanceId:l.instanceId, itemId:l.itemId,
+        name:l.item.name, label:l.label, category:l.cat.category,
+        unit:l.item.unit, unitCost:l.item.unitCost, qty:l.qty, subtotal:l.subtotal,
+        isCustom:l.isCustom||false,
+        ...(l.isCustom?{customName:l.customName,customUnit:l.customUnit,customCost:l.customCost}:{}),
+      })),
       equipTotal, softwareBudget, subWithSW, freightAmt, freightPct,
       addlContAmt, contingency, addlMarginAmt, marginPct, grand,
     };
@@ -337,7 +385,7 @@ function App() {
     const summaryData=[
       ["RULE OF THUMB BUDGET TOOL"],["ROM Estimate — For Planning Purposes Only"],[],
       ["Project",quote.projectName],["Customer",quote.customer],["Prepared By",quote.user],["Date",quote.date],[],
-      ["NOTE: All catalog unit prices include baked-in 21% margin and 3% contingency."],[],
+      ["NOTE: All catalog unit prices include baked-in 21% margin and 3% contingency. Custom items use user-supplied pricing."],[],
       ["CATEGORY","ITEM","DESCRIPTION/LABEL","UNIT","UNIT PRICE","QTY","SUBTOTAL"],
     ];
     const byCategory={};
@@ -349,19 +397,16 @@ function App() {
       summaryData.push([]);
     });
     summaryData.push(["BUDGET SUMMARY"]);
-    summaryData.push(["Turnkey Subtotal (incl. 21% margin + 3% contingency)","","","","","",quote.equipTotal]);
-    if(quote.softwareBudget>0){
-      summaryData.push(["Software Budget","","","","","",quote.softwareBudget]);
-      summaryData.push(["Combined Subtotal","","","","","",quote.subWithSW]);
-    }
+    summaryData.push(["Turnkey Subtotal (catalog items incl. 21% margin + 3% contingency)","","","","","",quote.equipTotal]);
+    if(quote.softwareBudget>0){summaryData.push(["Software Budget","","","","","",quote.softwareBudget]);summaryData.push(["Combined Subtotal","","","","","",quote.subWithSW]);}
     summaryData.push([`Freight & Rigging (${quote.freightPct}%)`,"","","","","",quote.freightAmt]);
     if(quote.contingency>0) summaryData.push([`Additional Contingency (${quote.contingency}%)`,"","","","","",quote.addlContAmt]);
     if(quote.marginPct>0)   summaryData.push([`Additional Margin (${quote.marginPct}%)`,"","","","","",quote.addlMarginAmt]);
     summaryData.push(["TOTAL ROM ESTIMATE","","","","","",quote.grand]);
     summaryData.push([]);
-    summaryData.push(["DISCLAIMER: All prices are turnkey ROM estimates ±20%. Catalog pricing includes 21% margin and 3% contingency. For planning purposes only — not a formal quotation."]);
+    summaryData.push(["DISCLAIMER: All prices are turnkey ROM estimates ±20%. For planning purposes only — not a formal quotation."]);
     const ws=XLSX.utils.aoa_to_sheet(summaryData);
-    ws["!cols"]=[{wch:46},{wch:40},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
+    ws["!cols"]=[{wch:52},{wch:38},{wch:22},{wch:8},{wch:14},{wch:8},{wch:16}];
     XLSX.utils.book_append_sheet(wb,ws,"Quote");
     const indexData=[["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
     const ws2=XLSX.utils.aoa_to_sheet(indexData);
@@ -383,14 +428,14 @@ function App() {
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>EQUIPMENT & SERVICES CATALOG</div>
         <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Click + to add · add same item multiple times</div>
-        {/* Baked-in rates notice */}
         <div style={{marginTop:"8px",padding:"8px 10px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"4px"}}>
           <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.08em",marginBottom:"2px"}}>⬡ PRICING NOTE</div>
           <div style={{fontSize:"11px",color:TEXTDIM,lineHeight:1.5}}>
-            All unit prices already include <span style={{color:GOLD}}>21% margin</span> and <span style={{color:GOLD}}>3% contingency</span>. Use the additional margin &amp; contingency fields in the budget summary only if the project warrants going above these baked-in rates.
+            All unit prices already include <span style={{color:GOLD}}>21% margin</span> and <span style={{color:GOLD}}>3% contingency</span>. Use the additional margin &amp; contingency fields only if the project warrants going above these baked-in rates.
           </div>
         </div>
       </div>
+
       {CATALOG.map(cat=>{
         const addedN=cat.items.reduce((s,i)=>s+(instanceCount[i.id]||0),0);
         const open=!!expanded[cat.category];
@@ -410,8 +455,7 @@ function App() {
               return (
                 <div key={item.id} style={{padding:"9px 14px 9px 28px",background:count>0?cat.color+"0D":"transparent",borderLeft:count>0?`3px solid ${cat.color}`:"3px solid transparent",borderBottom:`1px solid ${BGROW}`}}>
                   <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-                    <button onClick={()=>addItem(item)}
-                      style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:BGDEEP,cursor:"pointer",fontWeight:"bold",lineHeight:1}}>+</button>
+                    <button onClick={()=>addItem(item)} style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:BGDEEP,cursor:"pointer",fontWeight:"bold",lineHeight:1}}>+</button>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:"13px",color:count>0?TEXT:TEXTDIM,lineHeight:1.3}}>{item.name}</div>
                       <div style={{fontSize:"11px",color:count>0?cat.color:FADE,marginTop:"2px"}}>{`${fmt(item.unitCost)} / ${item.unit}`}{item.note?` · ${item.note}`:""}</div>
@@ -424,6 +468,65 @@ function App() {
           </div>
         );
       })}
+
+      {/* ── Custom Item Entry ─────────────────────────────────────────────── */}
+      <div style={{borderBottom:`1px solid ${BORDER}`}}>
+        <div onClick={e=>{e.preventDefault();setExpanded(p=>({...p,[CUSTOM_CATEGORY]:!p[CUSTOM_CATEGORY]}));}}
+          style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",background:expanded[CUSTOM_CATEGORY]?"#101420":"transparent"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px",minWidth:0}}>
+            <span style={{color:CUSTOM_COLOR,fontSize:"14px",flexShrink:0}}>✦</span>
+            <span style={{fontSize:"12px",fontWeight:"bold",letterSpacing:"0.04em"}}>{CUSTOM_CATEGORY.toUpperCase()}</span>
+            {customLineCount>0&&<span style={{background:CUSTOM_COLOR+"25",border:`1px solid ${CUSTOM_COLOR}50`,borderRadius:"10px",padding:"1px 7px",fontSize:"10px",color:CUSTOM_COLOR,flexShrink:0}}>{customLineCount}</span>}
+          </div>
+          <span style={{color:FADE,fontSize:"10px",flexShrink:0,marginLeft:"6px"}}>{expanded[CUSTOM_CATEGORY]?"▲":"▼"}</span>
+        </div>
+        {expanded[CUSTOM_CATEGORY]&&(
+          <div style={{padding:"14px 16px",background:"rgba(126,184,247,0.04)"}}>
+            <div style={{fontSize:"11px",color:TEXTDIM,marginBottom:"12px",lineHeight:1.5}}>
+              Enter any item not in the catalog — equipment, services, allowances, etc. Price you enter is used as-is.
+            </div>
+            {/* Name */}
+            <div style={{marginBottom:"10px"}}>
+              <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>ITEM NAME</div>
+              <input value={customName} onChange={e=>setCustomName(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
+                placeholder="e.g. Dock Levelers, Site Electrical Allowance..."
+                style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+            </div>
+            {/* Unit + Cost row */}
+            <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
+              <div style={{flex:"0 0 80px"}}>
+                <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>UNIT</div>
+                <select value={customUnit} onChange={e=>setCustomUnit(e.target.value)}
+                  style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 8px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}}>
+                  {["EA","LF","SF","LS","HR","MO","PP","Bay","LVL"].map(u=><option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>UNIT PRICE ($)</div>
+                <input value={customCost} onChange={e=>setCustomCost(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
+                  placeholder="0"
+                  inputMode="decimal"
+                  style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+              </div>
+              <div style={{flex:"0 0 72px"}}>
+                <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>QTY</div>
+                <input value={customQty} onChange={e=>setCustomQty(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&addCustomItem()}
+                  placeholder="1"
+                  inputMode="decimal"
+                  style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+              </div>
+            </div>
+            {customError&&<div style={{fontSize:"11px",color:"#FF4D6D",marginBottom:"8px"}}>{customError}</div>}
+            <button onClick={addCustomItem}
+              style={{width:"100%",padding:"9px",background:`rgba(126,184,247,0.15)`,border:`1px solid ${CUSTOM_COLOR}60`,borderRadius:"4px",color:CUSTOM_COLOR,fontSize:"12px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+              + ADD TO BUDGET
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -438,22 +541,21 @@ function App() {
         </div>
       ):(
         <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
-
           {editingQuoteId&&(
             <div style={{marginBottom:"14px",padding:"9px 12px",background:"rgba(255,191,0,0.07)",border:"1px solid rgba(255,191,0,0.3)",borderRadius:"5px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
               <div style={{fontSize:"11px",color:GOLD}}>✎ Editing saved quote — save to update, or clear to start fresh</div>
               <button onClick={clearBuilder} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"3px 8px",cursor:"pointer",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}}>✕ Clear</button>
             </div>
           )}
-
           <div style={{marginBottom:"16px"}}>
             <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>ROM ESTIMATE</div>
             <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
             <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% estimate</div>
           </div>
 
+          {/* Catalog categories */}
           {CATALOG.map(cat=>{
-            const catLines=computedLines.filter(l=>l.cat.category===cat.category);
+            const catLines=computedLines.filter(l=>!l.isCustom&&l.cat.category===cat.category);
             if(!catLines.length)return null;
             const catTotal=catLines.reduce((s,l)=>s+l.subtotal,0);
             return (
@@ -467,7 +569,7 @@ function App() {
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:"13px",color:TEXT,lineHeight:1.3}}>{line.item.name}</div>
-                        <input value={line.label} onChange={e=>updateLabel(line.instanceId,e.target.value)} placeholder="Add description (e.g. Receiving zone)..."
+                        <input value={line.label} onChange={e=>updateLabel(line.instanceId,e.target.value)} placeholder="Add description..."
                           style={{marginTop:"4px",width:"100%",background:"transparent",border:"none",borderBottom:`1px dashed ${BORDER}`,color:TEXTDIM,fontSize:"11px",fontFamily:"Georgia,serif",outline:"none",padding:"2px 0"}} />
                       </div>
                       <button onClick={()=>removeInstance(line.instanceId)} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",width:"24px",height:"24px",flexShrink:0,cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
@@ -487,33 +589,59 @@ function App() {
             );
           })}
 
-          {/* ── Summary ── */}
+          {/* Custom items section in budget */}
+          {computedLines.filter(l=>l.isCustom).length>0&&(
+            <div style={{marginBottom:"18px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:CUSTOM_COLOR+"12",borderLeft:`3px solid ${CUSTOM_COLOR}`,borderRadius:"0 4px 4px 0",marginBottom:"2px"}}>
+                <span style={{fontSize:"11px",letterSpacing:"0.1em",color:CUSTOM_COLOR}}>✦ {CUSTOM_CATEGORY.toUpperCase()}</span>
+                <span style={{fontSize:"13px",color:CUSTOM_COLOR,fontStyle:"italic"}}>{fmtFull(computedLines.filter(l=>l.isCustom).reduce((s,l)=>s+l.subtotal,0))}</span>
+              </div>
+              {computedLines.filter(l=>l.isCustom).map(line=>(
+                <div key={line.instanceId} style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:"13px",color:TEXT,lineHeight:1.3}}>{line.item.name}</div>
+                      <input value={line.label} onChange={e=>updateLabel(line.instanceId,e.target.value)} placeholder="Add description..."
+                        style={{marginTop:"4px",width:"100%",background:"transparent",border:"none",borderBottom:`1px dashed ${BORDER}`,color:TEXTDIM,fontSize:"11px",fontFamily:"Georgia,serif",outline:"none",padding:"2px 0"}} />
+                    </div>
+                    <button onClick={()=>removeInstance(line.instanceId)} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",width:"24px",height:"24px",flexShrink:0,cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"7px",gap:"6px"}}>
+                    <span style={{fontSize:"11px",color:MUTE,flex:1}}>{`${fmt(line.item.unitCost)} / ${line.item.unit}`} <span style={{color:CUSTOM_COLOR,fontSize:"10px"}}>· custom</span></span>
+                    <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
+                      <span style={{fontSize:"10px",color:FADE}}>QTY</span>
+                      <input value={line.raw} onChange={e=>updateQtyRaw(line.instanceId,e.target.value)} onBlur={()=>commitQty(line.instanceId)} inputMode="decimal"
+                        style={{width:"58px",textAlign:"right",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"4px 6px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
+                    </div>
+                    <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic",minWidth:"74px",textAlign:"right"}}>{fmtFull(line.subtotal)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Summary */}
           <div style={{marginTop:"20px",background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
             <div style={{padding:"10px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGET SUMMARY</div>
             </div>
-
-            {/* Turnkey subtotal with baked-in rates badge */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <div style={{flex:1}}>
                   <span style={{fontSize:"13px",color:"#8A8880"}}>Turnkey Subtotal</span>
                   <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Equip + install + commissioning + eng</div>
-                  {/* Baked-in badge */}
                   <div style={{marginTop:"6px",display:"inline-flex",alignItems:"center",gap:"6px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"3px",padding:"3px 8px"}}>
-                    <span style={{fontSize:"10px",color:GOLD}}>⬡ Includes baked-in {BASE_MARGIN_PCT}% margin + {BASE_CONT_PCT}% contingency</span>
+                    <span style={{fontSize:"10px",color:GOLD}}>⬡ Catalog prices include {BASE_MARGIN_PCT}% margin + {BASE_CONT_PCT}% contingency · Custom items use supplied pricing</span>
                   </div>
                 </div>
                 <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT,flexShrink:0,paddingLeft:"12px"}}>{fmtFull(equipTotal)}</span>
               </div>
             </div>
-
-            {/* Software */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(155,93,229,0.04)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                 <div>
                   <span style={{fontSize:"13px",color:"#8A8880"}}>Software Budget</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WES / WCS</div>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS</div>
                 </div>
                 {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareBudget)}</span>}
               </div>
@@ -526,8 +654,6 @@ function App() {
                 {softwareBudget>0&&<button onClick={()=>{setSoftwareBudget(0);setSoftwareRaw("");}} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"5px 8px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Clear</button>}
               </div>
             </div>
-
-            {/* Freight */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                 <div>
@@ -543,15 +669,11 @@ function App() {
               </div>
               <div style={{fontSize:"10px",color:FADE,marginTop:"6px"}}>3–4% light/small · 5–6% typical MHE · 8% heavy/robotic</div>
             </div>
-
-            {/* Additional Contingency */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
                 <div>
                   <span style={{fontSize:"13px",color:"#8A8880"}}>Additional Contingency</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>
-                    On top of baked-in {BASE_CONT_PCT}% · use for high-risk or early-stage projects
-                  </div>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>On top of baked-in {BASE_CONT_PCT}% · use for high-risk or early-stage projects</div>
                 </div>
                 <span style={{fontSize:"14px",color:GOLD}}>{addlContAmt>0?fmtFull(addlContAmt):<span style={{color:MUTE}}>—</span>}</span>
               </div>
@@ -560,17 +682,13 @@ function App() {
                   <button key={p} onClick={()=>setContingency(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:contingency===p?"rgba(255,191,0,0.2)":"transparent",border:contingency===p?"1px solid rgba(255,191,0,0.5)":`1px solid ${BORDER}`,color:contingency===p?GOLD:FADE}}>{p===0?"None":`+${p}%`}</button>
                 ))}
               </div>
-              {contingency>0&&<div style={{fontSize:"10px",color:GOLD,marginTop:"5px"}}>Total contingency: {BASE_CONT_PCT + contingency}% ({BASE_CONT_PCT}% baked-in + {contingency}% additional)</div>}
+              {contingency>0&&<div style={{fontSize:"10px",color:GOLD,marginTop:"5px"}}>Total contingency: {BASE_CONT_PCT+contingency}% ({BASE_CONT_PCT}% baked-in + {contingency}% additional)</div>}
             </div>
-
-            {/* Additional Margin */}
             <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(46,196,182,0.04)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
                 <div>
                   <span style={{fontSize:"13px",color:"#8A8880"}}>Additional Margin</span>
-                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>
-                    On top of baked-in {BASE_MARGIN_PCT}% · use for complex scope or risk premium
-                  </div>
+                  <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>On top of baked-in {BASE_MARGIN_PCT}% · use for complex scope or risk premium</div>
                 </div>
                 <span style={{fontSize:"14px",color:"#2EC4B6"}}>{addlMarginAmt>0?fmtFull(addlMarginAmt):<span style={{color:MUTE}}>—</span>}</span>
               </div>
@@ -579,14 +697,12 @@ function App() {
                   <button key={p} onClick={()=>setMarginPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:marginPct===p?"rgba(46,196,182,0.2)":"transparent",border:marginPct===p?"1px solid rgba(46,196,182,0.5)":`1px solid ${BORDER}`,color:marginPct===p?"#2EC4B6":FADE}}>{p===0?"None":`+${p}%`}</button>
                 ))}
               </div>
-              {marginPct>0&&<div style={{fontSize:"10px",color:"#2EC4B6",marginTop:"5px"}}>Total margin: {BASE_MARGIN_PCT + marginPct}% ({BASE_MARGIN_PCT}% baked-in + {marginPct}% additional)</div>}
+              {marginPct>0&&<div style={{fontSize:"10px",color:"#2EC4B6",marginTop:"5px"}}>Total margin: {BASE_MARGIN_PCT+marginPct}% ({BASE_MARGIN_PCT}% baked-in + {marginPct}% additional)</div>}
             </div>
-
-            {/* Grand total */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"15px 14px",background:"linear-gradient(135deg,rgba(255,107,53,0.08),rgba(255,191,0,0.05))"}}>
               <div>
                 <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE}}>TOTAL ROM ESTIMATE</div>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>ROM ±20% · incl. freight{contingency>0?` · +${contingency}% addl. contingency`:""}  {marginPct>0?` · +${marginPct}% addl. margin`:""}</div>
+                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>ROM ±20% · incl. freight{contingency>0?` · +${contingency}% addl. contingency`:""}{marginPct>0?` · +${marginPct}% addl. margin`:""}</div>
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontSize:mobile?"22px":"26px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</div>
@@ -601,16 +717,12 @@ function App() {
               {editingQuoteId?"💾 UPDATE QUOTE":"💾 SAVE QUOTE"}
             </button>
             {editingQuoteId&&(
-              <button onClick={clearBuilder}
-                style={{padding:"12px 16px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"5px",color:FADE,fontSize:"13px",cursor:"pointer",fontFamily:"Georgia,serif"}}>
-                ✕ Clear
-              </button>
+              <button onClick={clearBuilder} style={{padding:"12px 16px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"5px",color:FADE,fontSize:"13px",cursor:"pointer",fontFamily:"Georgia,serif"}}>✕ Clear</button>
             )}
           </div>
           {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"Quote saved"} successfully</div>}
-
           <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are turnkey ROM estimates ±20% and already include 21% margin and 3% contingency. Additional margin and contingency fields apply on top of these baked-in rates. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
+            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are turnkey ROM estimates ±20% and already include 21% margin and 3% contingency. Custom item pricing is user-supplied and not validated. Additional margin and contingency fields apply on top of baked-in rates. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
           </div>
         </div>
       )}
@@ -658,7 +770,6 @@ function App() {
           </div>
         </div>
       ))}
-
       {showLoadConfirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
           <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
