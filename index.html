@@ -202,9 +202,9 @@ const CATALOG = [
     { id:"pm10", name:"Stair Tower 3-level",                unit:"EA",  unitCost:22800,  defaultQty:1,    note:"" },
   ]},
   { category: "Demolition & Site Prep", icon: "⚒", color: "#A8855A", items: [
-    { id:"d1", name:"Powered Conveyor Demo",                          unit:"LF",  unitCost:90,  defaultQty:100, note:"" },
-    { id:"d2", name:"Gravity Conveyor Demo",                          unit:"LF",  unitCost:50,  defaultQty:100, note:"" },
-    { id:"d3", name:"Rack Bay Demo (4'×8', 5 beam levels)",           unit:"Bay", unitCost:130, defaultQty:50,  note:"Per bay" },
+    { id:"d1", name:"Powered Conveyor Demo",               unit:"LF",  unitCost:90,  defaultQty:100, note:"" },
+    { id:"d2", name:"Gravity Conveyor Demo",               unit:"LF",  unitCost:50,  defaultQty:100, note:"" },
+    { id:"d3", name:"Rack Bay Demo (4'×8', 5 beam levels)",unit:"Bay", unitCost:130, defaultQty:50,  note:"Per bay" },
   ]},
 ];
 
@@ -242,6 +242,7 @@ function App() {
   const [saveSuccess, setSaveSuccess]       = useState(false);
   const [editingQuoteId, setEditingQuoteId] = useState(null);
   const [showLoadConfirm, setShowLoadConfirm] = useState(null);
+  const [showForkConfirm, setShowForkConfirm] = useState(null);
 
   const [customName, setCustomName]   = useState("");
   const [customUnit, setCustomUnit]   = useState("EA");
@@ -293,15 +294,13 @@ function App() {
   }));
   const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId===instanceId?{...l,label}:l));
 
-  const loadQuote = (quote) => {
-    instanceCounter.current += 1000;
-    const base = instanceCounter.current;
-    setLines((quote.lines||[]).map((l,i) => {
-      if (l.isCustom) return { instanceId:`custom_${base+i}`, itemId:`custom_${base+i}`, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:true, customName:l.customName, customUnit:l.customUnit, customCost:l.customCost };
-      if (!ITEM_MAP[l.itemId]) return null;
-      return { instanceId:`${l.itemId}_${base+i}`, itemId:l.itemId, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:false };
-    }).filter(Boolean));
-    setProjName(quote.projectName);
+  const restoreLines = (quoteLines, baseCounter) => (quoteLines||[]).map((l,i) => {
+    if (l.isCustom) return { instanceId:`custom_${baseCounter+i}`, itemId:`custom_${baseCounter+i}`, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:true, customName:l.customName, customUnit:l.customUnit, customCost:l.customCost };
+    if (!ITEM_MAP[l.itemId]) return null;
+    return { instanceId:`${l.itemId}_${baseCounter+i}`, itemId:l.itemId, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:false };
+  }).filter(Boolean);
+
+  const applyQuoteSettings = (quote) => {
     setSaveCustomer(quote.customer);
     setSaveUser(quote.user);
     setFreightPct(quote.freightPct||5);
@@ -309,8 +308,25 @@ function App() {
     setMarginPct(quote.marginPct||0);
     setSoftwareBudget(quote.softwareBudget||0);
     setSoftwareRaw(quote.softwareBudget>0?quote.softwareBudget.toLocaleString():"");
+  };
+
+  const loadQuote = (quote) => {
+    instanceCounter.current += 1000;
+    setLines(restoreLines(quote.lines, instanceCounter.current));
+    setProjName(quote.projectName);
+    applyQuoteSettings(quote);
     setEditingQuoteId(quote.id);
     setShowLoadConfirm(null);
+    setMobileTab("budget");
+  };
+
+  const forkQuote = (quote) => {
+    instanceCounter.current += 1000;
+    setLines(restoreLines(quote.lines, instanceCounter.current));
+    setProjName(quote.projectName + " — Option 2");
+    applyQuoteSettings(quote);
+    setEditingQuoteId(null);  // null = Save will create a brand new quote
+    setShowForkConfirm(null);
     setMobileTab("budget");
   };
 
@@ -527,6 +543,11 @@ function App() {
               <button onClick={clearBuilder} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"3px 8px",cursor:"pointer",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}}>✕ Clear</button>
             </div>
           )}
+          {!editingQuoteId&&selCount>0&&(
+            <div style={{marginBottom:"14px",padding:"9px 12px",background:"rgba(126,184,247,0.06)",border:"1px solid rgba(126,184,247,0.2)",borderRadius:"5px"}}>
+              <div style={{fontSize:"11px",color:CUSTOM_COLOR}}>⎘ Forked quote — make your changes then Save as a new quote</div>
+            </div>
+          )}
           <div style={{marginBottom:"16px"}}>
             <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>ROM ESTIMATE</div>
             <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
@@ -692,13 +713,13 @@ function App() {
           <div style={{marginTop:"16px",display:"flex",gap:"10px"}}>
             <button onClick={()=>setShowSaveModal(true)}
               style={{flex:1,padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.15)":"rgba(255,107,53,0.15)",border:editingQuoteId?"1px solid rgba(255,191,0,0.5)":"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-              {editingQuoteId?"💾 UPDATE QUOTE":"💾 SAVE QUOTE"}
+              {editingQuoteId?"💾 UPDATE QUOTE":"💾 SAVE AS NEW QUOTE"}
             </button>
             {editingQuoteId&&(
               <button onClick={clearBuilder} style={{padding:"12px 16px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"5px",color:FADE,fontSize:"13px",cursor:"pointer",fontFamily:"Georgia,serif"}}>✕ Clear</button>
             )}
           </div>
-          {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"Quote saved"} successfully</div>}
+          {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"New quote saved"} successfully</div>}
           <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
             <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are turnkey ROM estimates ±20% and already include 21% margin and 3% contingency. Custom item pricing is user-supplied and not validated. Additional margin and contingency fields apply on top of baked-in rates. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
           </div>
@@ -734,13 +755,18 @@ function App() {
               <div style={{fontSize:"10px",color:MUTE,marginTop:"2px"}}>{q.lines.length} items</div>
             </div>
           </div>
-          <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
+          <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap"}}>
             <button onClick={()=>{ if(lines.length>0&&editingQuoteId!==q.id){setShowLoadConfirm(q);}else{loadQuote(q);}}}
-              style={{flex:1,padding:"7px 10px",background:editingQuoteId===q.id?"rgba(255,191,0,0.1)":"rgba(255,107,53,0.1)",border:editingQuoteId===q.id?"1px solid rgba(255,191,0,0.4)":"1px solid rgba(255,107,53,0.4)",borderRadius:"4px",color:editingQuoteId===q.id?GOLD:ACCENT,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
-              {editingQuoteId===q.id?"✎ EDITING":"✎ LOAD & EDIT"}
+              style={{flex:1,minWidth:"80px",padding:"7px 8px",background:editingQuoteId===q.id?"rgba(255,191,0,0.1)":"rgba(255,107,53,0.1)",border:editingQuoteId===q.id?"1px solid rgba(255,191,0,0.4)":"1px solid rgba(255,107,53,0.4)",borderRadius:"4px",color:editingQuoteId===q.id?GOLD:ACCENT,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.04em"}}>
+              {editingQuoteId===q.id?"✎ EDITING":"✎ EDIT"}
+            </button>
+            <button onClick={()=>{ if(lines.length>0){setShowForkConfirm(q);}else{forkQuote(q);}}}
+              title="Copy this quote as a starting point for a new option"
+              style={{flex:1,minWidth:"80px",padding:"7px 8px",background:"rgba(126,184,247,0.1)",border:"1px solid rgba(126,184,247,0.4)",borderRadius:"4px",color:CUSTOM_COLOR,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.04em"}}>
+              ⎘ FORK
             </button>
             <button onClick={()=>downloadExcel(q)}
-              style={{flex:1,padding:"7px 10px",background:"rgba(46,196,182,0.1)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.06em"}}>
+              style={{flex:1,minWidth:"80px",padding:"7px 8px",background:"rgba(46,196,182,0.1)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.04em"}}>
               ⬇ EXCEL
             </button>
             <button onClick={()=>deleteQuote(q.id)}
@@ -748,14 +774,30 @@ function App() {
           </div>
         </div>
       ))}
+
+      {/* Load confirm dialog */}
       {showLoadConfirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
           <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
             <div style={{fontSize:"14px",color:TEXT,marginBottom:"8px"}}>Load <span style={{color:ACCENT,fontStyle:"italic"}}>{showLoadConfirm.projectName}</span>?</div>
             <div style={{fontSize:"12px",color:FADE,marginBottom:"20px"}}>Your current unsaved work will be replaced.</div>
             <div style={{display:"flex",gap:"10px"}}>
-              <button onClick={()=>loadQuote(showLoadConfirm)} style={{flex:1,padding:"10px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"4px",color:ACCENT,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>Load Quote</button>
+              <button onClick={()=>loadQuote(showLoadConfirm)} style={{flex:1,padding:"10px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"4px",color:ACCENT,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>Load & Edit</button>
               <button onClick={()=>setShowLoadConfirm(null)} style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fork confirm dialog */}
+      {showForkConfirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
+          <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
+            <div style={{fontSize:"14px",color:TEXT,marginBottom:"8px"}}>Fork <span style={{color:CUSTOM_COLOR,fontStyle:"italic"}}>{showForkConfirm.projectName}</span>?</div>
+            <div style={{fontSize:"12px",color:FADE,marginBottom:"20px"}}>Your current unsaved work will be replaced. The original quote will not be changed.</div>
+            <div style={{display:"flex",gap:"10px"}}>
+              <button onClick={()=>forkQuote(showForkConfirm)} style={{flex:1,padding:"10px",background:"rgba(126,184,247,0.15)",border:"1px solid rgba(126,184,247,0.5)",borderRadius:"4px",color:CUSTOM_COLOR,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>⎘ Fork It</button>
+              <button onClick={()=>setShowForkConfirm(null)} style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Cancel</button>
             </div>
           </div>
         </div>
@@ -768,7 +810,7 @@ function App() {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
       <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"400px",overflow:"hidden"}}>
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${BORDER}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:"13px",letterSpacing:"0.1em",color:MUTE}}>{editingQuoteId?"UPDATE QUOTE":"SAVE QUOTE"}</div>
+          <div style={{fontSize:"13px",letterSpacing:"0.1em",color:MUTE}}>{editingQuoteId?"UPDATE QUOTE":"SAVE AS NEW QUOTE"}</div>
           <button onClick={()=>setShowSaveModal(false)} style={{background:"transparent",border:"none",color:FADE,fontSize:"16px",cursor:"pointer"}}>✕</button>
         </div>
         <div style={{padding:"20px"}}>
@@ -788,7 +830,7 @@ function App() {
           </div>
           <button onClick={doSaveQuote}
             style={{width:"100%",padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.2)":"rgba(255,107,53,0.2)",border:editingQuoteId?"1px solid rgba(255,191,0,0.6)":"1px solid rgba(255,107,53,0.6)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-            {editingQuoteId?"UPDATE QUOTE":"SAVE QUOTE"}
+            {editingQuoteId?"UPDATE QUOTE":"SAVE AS NEW QUOTE"}
           </button>
         </div>
       </div>
