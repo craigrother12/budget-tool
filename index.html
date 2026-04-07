@@ -100,115 +100,115 @@ const storage = (() => {
 
 const CATALOG = [
   { category: "Conveyor", icon: "⟶", color: "#FF6B35", items: [
-    { id:"c1",  name:"Non-Powered Roller (Gravity)",                 unit:"LF",  unitCost:74,      defaultQty:100, note:"" },
-    { id:"c2",  name:"Controlled Flow Gravity",                      unit:"LF",  unitCost:542,     defaultQty:100, note:"" },
-    { id:"c3",  name:"Belt on Roller/Slider Bed (level)",            unit:"LF",  unitCost:560,     defaultQty:100, note:"" },
-    { id:"c4",  name:"Belt on Roller/Slider Bed (incline/decline)",  unit:"LF",  unitCost:749,     defaultQty:100, note:"" },
-    { id:"c5",  name:"Live Roller Transportation (straight)",        unit:"LF",  unitCost:521,     defaultQty:100, note:"" },
-    { id:"c6",  name:"Zero-pressure Accumulation (photo sensor)",    unit:"LF",  unitCost:596,     defaultQty:100, note:"" },
-    { id:"c7",  name:"MDR Zero-pressure Accumulation (24/48 VDC)",  unit:"LF",  unitCost:753,     defaultQty:100, note:"" },
-    { id:"c8",  name:"MDR Zoned Belt Accumulation (24/48 VDC)",     unit:"LF",  unitCost:913,     defaultQty:100, note:"" },
-    { id:"c9",  name:"MDR Belted Incline/Decline (24/48 VDC)",      unit:"LF",  unitCost:1487,    defaultQty:50,  note:"" },
-    { id:"c10", name:"Recycling (MT Corrugate) Belt",                unit:"LF",  unitCost:617,     defaultQty:50,  note:"" },
-    { id:"c11", name:"Chain Driven Live Roller",                     unit:"LF",  unitCost:2520,    defaultQty:50,  note:"" },
-    { id:"c12", name:"2-Strand Dragline",                            unit:"LF",  unitCost:1940,    defaultQty:50,  note:"" },
-    { id:"c13", name:"Overhead Chain (encl track) Less Carriers",    unit:"LF",  unitCost:460,     defaultQty:100, note:"" },
-    { id:"c14", name:"Overhead Chain Carriers",                      unit:"EA",  unitCost:45,      defaultQty:50,  note:"Per carrier" },
+    { id:"c1",  name:"Non-Powered Roller (Gravity)",                 unit:"LF",  unitCost:89,      defaultQty:1, note:"" },
+    { id:"c2",  name:"Controlled Flow Gravity",                      unit:"LF",  unitCost:650,     defaultQty:1, note:"" },
+    { id:"c3",  name:"Belt on Roller/Slider Bed (level)",            unit:"LF",  unitCost:672,     defaultQty:1, note:"" },
+    { id:"c4",  name:"Belt on Roller/Slider Bed (incline/decline)",  unit:"LF",  unitCost:899,     defaultQty:1, note:"" },
+    { id:"c5",  name:"Live Roller Transportation (straight)",        unit:"LF",  unitCost:625,     defaultQty:1, note:"" },
+    { id:"c6",  name:"Zero-pressure Accumulation (photo sensor)",    unit:"LF",  unitCost:715,     defaultQty:1, note:"" },
+    { id:"c7",  name:"MDR Zero-pressure Accumulation (24/48 VDC)",  unit:"LF",  unitCost:904,     defaultQty:1, note:"" },
+    { id:"c8",  name:"MDR Zoned Belt Accumulation (24/48 VDC)",     unit:"LF",  unitCost:1096,    defaultQty:1, note:"" },
+    { id:"c9",  name:"MDR Belted Incline/Decline (24/48 VDC)",      unit:"LF",  unitCost:1784,    defaultQty:1,  note:"" },
+    { id:"c10", name:"Recycling (MT Corrugate) Belt",                unit:"LF",  unitCost:740,     defaultQty:1,  note:"" },
+    { id:"c11", name:"Chain Driven Live Roller",                     unit:"LF",  unitCost:3024,    defaultQty:1,  note:"" },
+    { id:"c12", name:"2-Strand Dragline",                            unit:"LF",  unitCost:2328,    defaultQty:1,  note:"" },
+    { id:"c13", name:"Overhead Chain (encl track) Less Carriers",    unit:"LF",  unitCost:552,     defaultQty:1, note:"" },
+    { id:"c14", name:"Overhead Chain Carriers",                      unit:"EA",  unitCost:54,      defaultQty:1,  note:"Per carrier" },
   ]},
   { category: "Conveyor Accessories", icon: "⤷", color: "#FF9A3C", items: [
-    { id:"ca1",  name:"Gravity (curves/spurs)",                          unit:"EA", unitCost:1360,   defaultQty:4, note:"" },
-    { id:"ca2",  name:"Live Roller Transportation (MDR curves/spurs)",   unit:"EA", unitCost:6620,   defaultQty:4, note:"" },
-    { id:"ca3",  name:"Belt Curve",                                      unit:"EA", unitCost:15700,  defaultQty:4, note:"" },
-    { id:"ca4",  name:"Live Roller Merge Table (1-fixed deflector)",     unit:"EA", unitCost:11800,  defaultQty:2, note:"" },
-    { id:"ca5",  name:"Wide Belt Merge (per # of infeeds)",              unit:"EA", unitCost:18900,  defaultQty:2, note:"" },
-    { id:"ca6",  name:"Brake Belt",                                      unit:"EA", unitCost:10900,  defaultQty:2, note:"" },
-    { id:"ca7",  name:"Brake-Spacer Belt",                               unit:"EA", unitCost:16280,  defaultQty:2, note:"" },
-    { id:"ca8",  name:"Brake-Meter Belt",                                unit:"EA", unitCost:18010,  defaultQty:2, note:"" },
-    { id:"ca9",  name:"Air-operated Stop",                               unit:"EA", unitCost:3550,   defaultQty:4, note:"" },
-    { id:"ca10", name:"Gravity Personnel Gate",                          unit:"EA", unitCost:3470,   defaultQty:2, note:"" },
-    { id:"ca11", name:"MDR Powered Roller Personnel Gate",               unit:"EA", unitCost:9200,   defaultQty:2, note:"" },
-    { id:"ca12", name:"Belt Telescoping Loader/Unloader (53' trailer)",  unit:"EA", unitCost:118900, defaultQty:1, note:"" },
-    { id:"ca13", name:"Belt Fixed Boom Loader/Unloader (50' long)",      unit:"EA", unitCost:62400,  defaultQty:1, note:"" },
-    { id:"ca14", name:"Flexible Loader/Unloader",                        unit:"EA", unitCost:81500,  defaultQty:1, note:"" },
-    { id:"ca15", name:"Flexible Gravity Loader/Unloader (60'/26')",      unit:"EA", unitCost:6930,   defaultQty:1, note:"60' expanded / 26' compacted" },
-    { id:"ca16", name:"Spiral, powered, 1-level, 10'",                   unit:"EA", unitCost:101600, defaultQty:1, note:"" },
-    { id:"ca17", name:"Spiral, powered, 2-level, 20'",                   unit:"EA", unitCost:119600, defaultQty:1, note:"" },
-    { id:"ca18", name:"Spiral, powered, 3-level, 30'",                   unit:"EA", unitCost:134500, defaultQty:1, note:"" },
-    { id:"ca19", name:"Divert Spiral",                                   unit:"EA", unitCost:33500,  defaultQty:1, note:"" },
-    { id:"ca20", name:"Merge Spiral",                                    unit:"EA", unitCost:33500,  defaultQty:1, note:"" },
-    { id:"ca21", name:"Gravity Spiral (10')",                            unit:"EA", unitCost:49100,  defaultQty:1, note:"" },
+    { id:"ca1",  name:"Gravity (curves/spurs)",                          unit:"EA", unitCost:1632,   defaultQty:1, note:"" },
+    { id:"ca2",  name:"Live Roller Transportation (MDR curves/spurs)",   unit:"EA", unitCost:7944,   defaultQty:1, note:"" },
+    { id:"ca3",  name:"Belt Curve",                                      unit:"EA", unitCost:18840,  defaultQty:1, note:"" },
+    { id:"ca4",  name:"Live Roller Merge Table (1-fixed deflector)",     unit:"EA", unitCost:14160,  defaultQty:1, note:"" },
+    { id:"ca5",  name:"Wide Belt Merge (per # of infeeds)",              unit:"EA", unitCost:22680,  defaultQty:1, note:"" },
+    { id:"ca6",  name:"Brake Belt",                                      unit:"EA", unitCost:13080,  defaultQty:1, note:"" },
+    { id:"ca7",  name:"Brake-Spacer Belt",                               unit:"EA", unitCost:19536,  defaultQty:1, note:"" },
+    { id:"ca8",  name:"Brake-Meter Belt",                                unit:"EA", unitCost:21612,  defaultQty:1, note:"" },
+    { id:"ca9",  name:"Air-operated Stop",                               unit:"EA", unitCost:4260,   defaultQty:1, note:"" },
+    { id:"ca10", name:"Gravity Personnel Gate",                          unit:"EA", unitCost:4164,   defaultQty:1, note:"" },
+    { id:"ca11", name:"MDR Powered Roller Personnel Gate",               unit:"EA", unitCost:11040,  defaultQty:1, note:"" },
+    { id:"ca12", name:"Belt Telescoping Loader/Unloader (53' trailer)",  unit:"EA", unitCost:142680, defaultQty:1, note:"" },
+    { id:"ca13", name:"Belt Fixed Boom Loader/Unloader (50' long)",      unit:"EA", unitCost:74880,  defaultQty:1, note:"" },
+    { id:"ca14", name:"Flexible Loader/Unloader",                        unit:"EA", unitCost:97800,  defaultQty:1, note:"" },
+    { id:"ca15", name:"Flexible Gravity Loader/Unloader (60'/26')",      unit:"EA", unitCost:8316,   defaultQty:1, note:"60' expanded / 26' compacted" },
+    { id:"ca16", name:"Spiral, powered, 1-level, 10'",                   unit:"EA", unitCost:121920, defaultQty:1, note:"" },
+    { id:"ca17", name:"Spiral, powered, 2-level, 20'",                   unit:"EA", unitCost:143520, defaultQty:1, note:"" },
+    { id:"ca18", name:"Spiral, powered, 3-level, 30'",                   unit:"EA", unitCost:161400, defaultQty:1, note:"" },
+    { id:"ca19", name:"Divert Spiral",                                   unit:"EA", unitCost:40200,  defaultQty:1, note:"" },
+    { id:"ca20", name:"Merge Spiral",                                    unit:"EA", unitCost:40200,  defaultQty:1, note:"" },
+    { id:"ca21", name:"Gravity Spiral (10')",                            unit:"EA", unitCost:58920,  defaultQty:1, note:"" },
   ]},
   { category: "Sortation Equipment", icon: "⑆", color: "#FFBF00", items: [
-    { id:"s1",  name:"Induction Belt",                                    unit:"EA", unitCost:36300,  defaultQty:1,  note:"" },
-    { id:"s2",  name:"Line Scanner (single side)",                        unit:"EA", unitCost:10600,  defaultQty:2,  note:"" },
-    { id:"s3",  name:"Omni Scanner (2-sided)",                            unit:"EA", unitCost:22100,  defaultQty:2,  note:"" },
-    { id:"s4",  name:"Scanner Tunnel (5-sided)",                          unit:"EA", unitCost:95130,  defaultQty:1,  note:"" },
-    { id:"s5",  name:"Periscope Scanner",                                 unit:"EA", unitCost:12500,  defaultQty:2,  note:"" },
-    { id:"s6",  name:"Camera Scanner (single side)",                      unit:"EA", unitCost:10580,  defaultQty:2,  note:"" },
-    { id:"s7",  name:"Camera Tunnel (5-sided)",                           unit:"EA", unitCost:95130,  defaultQty:1,  note:"" },
-    { id:"s8",  name:"In-motion Scale (50 CPM or less, single stage)",    unit:"EA", unitCost:44800,  defaultQty:1,  note:"" },
-    { id:"s9",  name:"Right Angle Transfer",                              unit:"EA", unitCost:14900,  defaultQty:4,  note:"" },
-    { id:"s10", name:"Pick Zone Routing Transfer (single sided)",         unit:"EA", unitCost:21500,  defaultQty:4,  note:"" },
-    { id:"s11", name:"Pick Zone Routing Transfer (double sided)",         unit:"EA", unitCost:62100,  defaultQty:2,  note:"" },
-    { id:"s12", name:"Hi-speed Wheel Divert Per Divert w/Spur",          unit:"EA", unitCost:30600,  defaultQty:4,  note:"" },
-    { id:"s13", name:"Narrow Belt Sorter (per LF, less diverts/spurs)",  unit:"LF", unitCost:1430,   defaultQty:60, note:"" },
-    { id:"s14", name:"Sliding Shoe Sorter (per divert, single sided)",   unit:"EA", unitCost:68700,  defaultQty:4,  note:"" },
-    { id:"s15", name:"Sliding Shoe Sorter (per divert, double sided)",   unit:"EA", unitCost:110000, defaultQty:4,  note:"" },
+    { id:"s1",  name:"Induction Belt",                                    unit:"EA", unitCost:43560,  defaultQty:1,  note:"" },
+    { id:"s2",  name:"Line Scanner (single side)",                        unit:"EA", unitCost:12720,  defaultQty:1,  note:"" },
+    { id:"s3",  name:"Omni Scanner (2-sided)",                            unit:"EA", unitCost:26520,  defaultQty:1,  note:"" },
+    { id:"s4",  name:"Scanner Tunnel (5-sided)",                          unit:"EA", unitCost:114156, defaultQty:1,  note:"" },
+    { id:"s5",  name:"Periscope Scanner",                                 unit:"EA", unitCost:15000,  defaultQty:1,  note:"" },
+    { id:"s6",  name:"Camera Scanner (single side)",                      unit:"EA", unitCost:12696,  defaultQty:1,  note:"" },
+    { id:"s7",  name:"Camera Tunnel (5-sided)",                           unit:"EA", unitCost:114156, defaultQty:1,  note:"" },
+    { id:"s8",  name:"In-motion Scale (50 CPM or less, single stage)",    unit:"EA", unitCost:53760,  defaultQty:1,  note:"" },
+    { id:"s9",  name:"Right Angle Transfer",                              unit:"EA", unitCost:17880,  defaultQty:1,  note:"" },
+    { id:"s10", name:"Pick Zone Routing Transfer (single sided)",         unit:"EA", unitCost:25800,  defaultQty:1,  note:"" },
+    { id:"s11", name:"Pick Zone Routing Transfer (double sided)",         unit:"EA", unitCost:74520,  defaultQty:1,  note:"" },
+    { id:"s12", name:"Hi-speed Wheel Divert Per Divert w/Spur",          unit:"EA", unitCost:36720,  defaultQty:1,  note:"" },
+    { id:"s13", name:"Narrow Belt Sorter (per LF, less diverts/spurs)",  unit:"LF", unitCost:1716,   defaultQty:1, note:"" },
+    { id:"s14", name:"Sliding Shoe Sorter (per divert, single sided)",   unit:"EA", unitCost:82440,  defaultQty:1,  note:"" },
+    { id:"s15", name:"Sliding Shoe Sorter (per divert, double sided)",   unit:"EA", unitCost:132000, defaultQty:1,  note:"" },
   ]},
   { category: "Storage Media", icon: "▦", color: "#2EC4B6", items: [
-    { id:"r1", name:"Mezzanine",                          unit:"SF",  unitCost:48,  defaultQty:5000, note:"" },
-    { id:"r2", name:"Pallet Rack — Selective Wide Aisle", unit:"PP",  unitCost:88,  defaultQty:500,  note:"" },
-    { id:"r3", name:"Pallet Rack — Selective VNA",        unit:"PP",  unitCost:88,  defaultQty:500,  note:"" },
-    { id:"r4", name:"Pallet Rack — Pushback",             unit:"PP",  unitCost:104, defaultQty:200,  note:"" },
-    { id:"r5", name:"Pallet Rack — Drive-in",             unit:"PP",  unitCost:86,  defaultQty:200,  note:"" },
-    { id:"r6", name:"Shelving",                           unit:"Bay", unitCost:225, defaultQty:50,   note:"" },
-    { id:"r7", name:"Pallet Flow",                        unit:"PP",  unitCost:331, defaultQty:100,  note:"" },
+    { id:"r1", name:"Mezzanine",                          unit:"SF",  unitCost:58,  defaultQty:1, note:"" },
+    { id:"r2", name:"Pallet Rack — Selective Wide Aisle", unit:"PP",  unitCost:106, defaultQty:1,  note:"" },
+    { id:"r3", name:"Pallet Rack — Selective VNA",        unit:"PP",  unitCost:106, defaultQty:1,  note:"" },
+    { id:"r4", name:"Pallet Rack — Pushback",             unit:"PP",  unitCost:125, defaultQty:1,  note:"" },
+    { id:"r5", name:"Pallet Rack — Drive-in",             unit:"PP",  unitCost:103, defaultQty:1,  note:"" },
+    { id:"r6", name:"Shelving",                           unit:"Bay", unitCost:270, defaultQty:1,   note:"" },
+    { id:"r7", name:"Pallet Flow",                        unit:"PP",  unitCost:397, defaultQty:1,  note:"" },
   ]},
   { category: "Picking & Packing Equipment", icon: "◻", color: "#F15BB5", items: [
-    { id:"p1", name:"Ergonomic Work Station",           unit:"EA", unitCost:1620,  defaultQty:6,   note:"" },
-    { id:"p2", name:"Label Printer for Workstation",    unit:"EA", unitCost:1780,  defaultQty:6,   note:"" },
-    { id:"p3", name:"Pick Cart",                        unit:"EA", unitCost:1170,  defaultQty:10,  note:"" },
-    { id:"p4", name:"Fatigue Mats",                     unit:"EA", unitCost:150,   defaultQty:10,  note:"" },
-    { id:"p5", name:"Static Scale with Ball Top",       unit:"EA", unitCost:7220,  defaultQty:2,   note:"" },
-    { id:"p6", name:"Manifesting Station (w/o scale)",  unit:"EA", unitCost:2770,  defaultQty:4,   note:"" },
-    { id:"p7", name:"Highway Guard Rail",               unit:"LF", unitCost:120,   defaultQty:100, note:"" },
-    { id:"p8", name:"Semi-Auto Carton Taper",           unit:"EA", unitCost:21200, defaultQty:2,   note:"" },
-    { id:"p9", name:"Dunnage/Void Fill Dispenser",      unit:"EA", unitCost:3430,  defaultQty:2,   note:"" },
+    { id:"p1", name:"Ergonomic Work Station",           unit:"EA", unitCost:1944,  defaultQty:1,   note:"" },
+    { id:"p2", name:"Label Printer for Workstation",    unit:"EA", unitCost:2136,  defaultQty:1,   note:"" },
+    { id:"p3", name:"Pick Cart",                        unit:"EA", unitCost:1404,  defaultQty:1,  note:"" },
+    { id:"p4", name:"Fatigue Mats",                     unit:"EA", unitCost:180,   defaultQty:1,  note:"" },
+    { id:"p5", name:"Static Scale with Ball Top",       unit:"EA", unitCost:8664,  defaultQty:1,   note:"" },
+    { id:"p6", name:"Manifesting Station (w/o scale)",  unit:"EA", unitCost:3324,  defaultQty:1,   note:"" },
+    { id:"p7", name:"Highway Guard Rail",               unit:"LF", unitCost:144,   defaultQty:1, note:"" },
+    { id:"p8", name:"Semi-Auto Carton Taper",           unit:"EA", unitCost:25440, defaultQty:1,   note:"" },
+    { id:"p9", name:"Dunnage/Void Fill Dispenser",      unit:"EA", unitCost:4116,  defaultQty:1,   note:"" },
   ]},
   { category: "Other Technologies & Support Equipment", icon: "◈", color: "#FF4D6D", items: [
-    { id:"t1",  name:"Pick/Put to Light (light hardware only)",        unit:"EA", unitCost:22050,   defaultQty:1,  note:"" },
-    { id:"t2",  name:"Voice Pick Hardware",                            unit:"EA", unitCost:165,     defaultQty:10, note:"" },
-    { id:"t3",  name:"RF Hand Held Scanners",                          unit:"EA", unitCost:3780,    defaultQty:10, note:"" },
-    { id:"t4",  name:"Autonomous Mobile Robot (AMR) P-2-P Transport", unit:"EA", unitCost:80000,   defaultQty:5,  note:"" },
-    { id:"t5",  name:"Pick Assist AMR (Leased)",                       unit:"MO", unitCost:1400,    defaultQty:12, note:"Per robot per month" },
-    { id:"t6",  name:"Robotic Arm with End Effector for Unit Pick",   unit:"EA", unitCost:700000,  defaultQty:1,  note:"" },
-    { id:"t7",  name:"Unit Load (Pallet ASRS) System per Aisle",      unit:"EA", unitCost:2300000, defaultQty:1,  note:"" },
-    { id:"t8",  name:"Mini Load (Tote/Bin ASRS) System per Aisle",    unit:"EA", unitCost:2300000, defaultQty:1,  note:"" },
-    { id:"t9",  name:"Pallet Stretch Wrapper — Semi-Automated",       unit:"EA", unitCost:43300,   defaultQty:1,  note:"" },
-    { id:"t10", name:"Pallet Stretch Wrapper — Automated",            unit:"EA", unitCost:224700,  defaultQty:1,  note:"" },
-    { id:"t11", name:"Print/Apply (1 Print Head, no software)",       unit:"EA", unitCost:42500,   defaultQty:2,  note:"" },
-    { id:"t12", name:"Totes",                                          unit:"EA", unitCost:18,      defaultQty:500,note:"" },
+    { id:"t1",  name:"Pick/Put to Light (light hardware only)",        unit:"EA", unitCost:26460,   defaultQty:1,  note:"" },
+    { id:"t2",  name:"Voice Pick Hardware",                            unit:"EA", unitCost:198,     defaultQty:1, note:"" },
+    { id:"t3",  name:"RF Hand Held Scanners",                          unit:"EA", unitCost:4536,    defaultQty:1, note:"" },
+    { id:"t4",  name:"Autonomous Mobile Robot (AMR) P-2-P Transport", unit:"EA", unitCost:96000,   defaultQty:1,  note:"" },
+    { id:"t5",  name:"Pick Assist AMR (Leased)",                       unit:"MO", unitCost:1680,    defaultQty:1, note:"Per robot per month" },
+    { id:"t6",  name:"Robotic Arm with End Effector for Unit Pick",   unit:"EA", unitCost:840000,  defaultQty:1,  note:"" },
+    { id:"t7",  name:"Unit Load (Pallet ASRS) System per Aisle",      unit:"EA", unitCost:2760000, defaultQty:1,  note:"" },
+    { id:"t8",  name:"Mini Load (Tote/Bin ASRS) System per Aisle",    unit:"EA", unitCost:2760000, defaultQty:1,  note:"" },
+    { id:"t9",  name:"Pallet Stretch Wrapper — Semi-Automated",       unit:"EA", unitCost:51960,   defaultQty:1,  note:"" },
+    { id:"t10", name:"Pallet Stretch Wrapper — Automated",            unit:"EA", unitCost:269640,  defaultQty:1,  note:"" },
+    { id:"t11", name:"Print/Apply (1 Print Head, no software)",       unit:"EA", unitCost:51000,   defaultQty:1,  note:"" },
+    { id:"t12", name:"Totes",                                          unit:"EA", unitCost:22,      defaultQty:1,note:"" },
   ]},
   { category: "Pick Module", icon: "⊞", color: "#9B5DE5", items: [
-    { id:"pm1",  name:"Static Pallet",                      unit:"PP",  unitCost:294,    defaultQty:100,  note:"" },
-    { id:"pm2",  name:"Decked Surface",                     unit:"SF",  unitCost:47,     defaultQty:2000, note:"" },
-    { id:"pm3",  name:"Shelving (Floor + 1 Level)",         unit:"Bay", unitCost:1380,   defaultQty:20,   note:"" },
-    { id:"pm4",  name:"Flow Rack",                          unit:"LVL", unitCost:1610,   defaultQty:10,   note:"Per level" },
-    { id:"pm5",  name:"Pallet Flow",                        unit:"PP",  unitCost:620,    defaultQty:50,   note:"" },
-    { id:"pm6",  name:"Vertical Lift Pallet",               unit:"EA",  unitCost:134100, defaultQty:1,    note:"" },
-    { id:"pm7",  name:"Lighting — LED with motion sensors", unit:"SF",  unitCost:15,     defaultQty:5000, note:"" },
-    { id:"pm8",  name:"Sprinklers",                         unit:"SF",  unitCost:55,     defaultQty:5000, note:"" },
-    { id:"pm9",  name:"Stair Tower 2-level",                unit:"EA",  unitCost:15300,  defaultQty:2,    note:"" },
-    { id:"pm10", name:"Stair Tower 3-level",                unit:"EA",  unitCost:22800,  defaultQty:1,    note:"" },
+    { id:"pm1",  name:"Static Pallet",                      unit:"PP",  unitCost:353,    defaultQty:1,  note:"" },
+    { id:"pm2",  name:"Decked Surface",                     unit:"SF",  unitCost:56,     defaultQty:1, note:"" },
+    { id:"pm3",  name:"Shelving (Floor + 1 Level)",         unit:"Bay", unitCost:1656,   defaultQty:1,   note:"" },
+    { id:"pm4",  name:"Flow Rack",                          unit:"LVL", unitCost:1932,   defaultQty:1,   note:"Per level" },
+    { id:"pm5",  name:"Pallet Flow",                        unit:"PP",  unitCost:744,    defaultQty:1,   note:"" },
+    { id:"pm6",  name:"Vertical Lift Pallet",               unit:"EA",  unitCost:160920, defaultQty:1,    note:"" },
+    { id:"pm7",  name:"Lighting — LED with motion sensors", unit:"SF",  unitCost:18,     defaultQty:1, note:"" },
+    { id:"pm8",  name:"Sprinklers",                         unit:"SF",  unitCost:66,     defaultQty:1, note:"" },
+    { id:"pm9",  name:"Stair Tower 2-level",                unit:"EA",  unitCost:18360,  defaultQty:1,    note:"" },
+    { id:"pm10", name:"Stair Tower 3-level",                unit:"EA",  unitCost:27360,  defaultQty:1,    note:"" },
   ]},
   { category: "Demolition & Site Prep", icon: "⚒", color: "#A8855A", items: [
-    { id:"d1", name:"Powered Conveyor Demo",               unit:"LF",  unitCost:90,  defaultQty:100, note:"" },
-    { id:"d2", name:"Gravity Conveyor Demo",               unit:"LF",  unitCost:50,  defaultQty:100, note:"" },
-    { id:"d3", name:"Rack Bay Demo (4'×8', 5 beam levels)",unit:"Bay", unitCost:130, defaultQty:50,  note:"Per bay" },
+    { id:"d1", name:"Powered Conveyor Demo",                unit:"LF",  unitCost:108, defaultQty:1, note:"" },
+    { id:"d2", name:"Gravity Conveyor Demo",                unit:"LF",  unitCost:60,  defaultQty:1, note:"" },
+    { id:"d3", name:"Rack Bay Demo (4'×8', 5 beam levels)", unit:"Bay", unitCost:156, defaultQty:1,  note:"Per bay" },
   ]},
 ];
 
-const BASE_MARGIN_PCT = 21;
+const BASE_MARGIN_PCT = 23;
 const BASE_CONT_PCT   = 3;
 
 const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
@@ -325,7 +325,7 @@ function App() {
     setLines(restoreLines(quote.lines, instanceCounter.current));
     setProjName(quote.projectName + " — Option 2");
     applyQuoteSettings(quote);
-    setEditingQuoteId(null);  // null = Save will create a brand new quote
+    setEditingQuoteId(null);
     setShowForkConfirm(null);
     setMobileTab("budget");
   };
@@ -388,7 +388,7 @@ function App() {
     const summaryData=[
       ["RULE OF THUMB BUDGET TOOL"],["ROM Estimate — For Planning Purposes Only"],[],
       ["Project",quote.projectName],["Customer",quote.customer],["Prepared By",quote.user],["Date",quote.date],[],
-      ["NOTE: All catalog unit prices include baked-in 21% margin and 3% contingency. Custom items use user-supplied pricing."],[],
+      ["NOTE: All catalog unit prices include baked-in 23% margin and 3% contingency. Custom items use user-supplied pricing."],[],
       ["CATEGORY","ITEM","DESCRIPTION/LABEL","UNIT","UNIT PRICE","QTY","SUBTOTAL"],
     ];
     const byCategory={};
@@ -400,7 +400,7 @@ function App() {
       summaryData.push([]);
     });
     summaryData.push(["BUDGET SUMMARY"]);
-    summaryData.push(["Turnkey Subtotal (catalog items incl. 21% margin + 3% contingency)","","","","","",quote.equipTotal]);
+    summaryData.push(["Turnkey Subtotal (catalog items incl. 23% margin + 3% contingency)","","","","","",quote.equipTotal]);
     if(quote.softwareBudget>0){summaryData.push(["Software Budget","","","","","",quote.softwareBudget]);summaryData.push(["Combined Subtotal","","","","","",quote.subWithSW]);}
     summaryData.push([`Freight & Rigging (${quote.freightPct}%)`,"","","","","",quote.freightAmt]);
     if(quote.contingency>0) summaryData.push([`Additional Contingency (${quote.contingency}%)`,"","","","","",quote.addlContAmt]);
@@ -434,7 +434,7 @@ function App() {
         <div style={{marginTop:"8px",padding:"8px 10px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"4px"}}>
           <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.08em",marginBottom:"2px"}}>⬡ PRICING NOTE</div>
           <div style={{fontSize:"11px",color:TEXTDIM,lineHeight:1.5}}>
-            All unit prices already include <span style={{color:GOLD}}>21% margin</span> and <span style={{color:GOLD}}>3% contingency</span>. Use the additional margin &amp; contingency fields only if the project warrants going above these baked-in rates.
+            All unit prices already include <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin</span> and <span style={{color:GOLD}}>{BASE_CONT_PCT}% contingency</span>. Use the additional margin &amp; contingency fields only if the project warrants going above these baked-in rates.
           </div>
         </div>
       </div>
@@ -721,7 +721,7 @@ function App() {
           </div>
           {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"New quote saved"} successfully</div>}
           <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are turnkey ROM estimates ±20% and already include 21% margin and 3% contingency. Custom item pricing is user-supplied and not validated. Additional margin and contingency fields apply on top of baked-in rates. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
+            <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are turnkey ROM estimates ±20% and already include {BASE_MARGIN_PCT}% margin and {BASE_CONT_PCT}% contingency. Custom item pricing is user-supplied and not validated. Additional margin and contingency fields apply on top of baked-in rates. Subject to site survey, final scope, and market conditions. For planning purposes only — not a formal quotation.
           </div>
         </div>
       )}
@@ -775,7 +775,6 @@ function App() {
         </div>
       ))}
 
-      {/* Load confirm dialog */}
       {showLoadConfirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
           <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
@@ -789,7 +788,6 @@ function App() {
         </div>
       )}
 
-      {/* Fork confirm dialog */}
       {showForkConfirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
           <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
