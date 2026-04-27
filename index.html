@@ -378,7 +378,12 @@ function App() {
   // Internal blended margins (informational — do not change totals)
   const internalMechAmt   = equipTotal * (INTERNAL_MECH_MGN_PCT/100);
   const internalSwAmt     = softwareBudget * (INTERNAL_SW_MGN_PCT/100);
-  const subWithSW         = equipTotal + softwareBudget;
+  // Software sell price: user enters cost, we gross up via margin-on-sell + contingency
+  // Formula: cost × 1.03 / (1 - 0.23)
+  const softwareSell      = softwareBudget > 0 ? softwareBudget * (1 + BASE_CONT_PCT/100) / (1 - BASE_MARGIN_PCT/100) : 0;
+  const swContAmt         = softwareBudget > 0 ? softwareBudget * (BASE_CONT_PCT/100) : 0;
+  const swMarginAmt       = softwareSell - softwareBudget - swContAmt;
+  const subWithSW         = equipTotal + softwareSell;
   const freightAmt        = subWithSW * (freightPct/100);
   const addlContAmt       = (subWithSW+freightAmt) * (contingency/100);
   const addlMarginAmt     = (subWithSW+freightAmt+addlContAmt) * (marginPct/100);
@@ -409,7 +414,7 @@ function App() {
         isCustom:l.isCustom||false, areaId:l.areaId||null,
         ...(l.isCustom?{customName:l.customName,customUnit:l.customUnit,customCost:l.customCost}:{}),
       })),
-      equipTotal, softwareBudget, softwareAreaId, subWithSW, freightAmt, freightPct,
+      equipTotal, softwareBudget, softwareSell, swContAmt, swMarginAmt, softwareAreaId, subWithSW, freightAmt, freightPct,
       addlContAmt, contingency, addlMarginAmt, marginPct, grand,
       internalMechAmt, internalSwAmt,
     };
@@ -472,17 +477,22 @@ function App() {
         areaLines.forEach((l,idx)=>{ d.push([idx===0?areaName:"", l.category, l.name, l.label||"", l.unit, l.unitCost, l.qty, l.subtotal]); });
         // Software in this area
         if (quote.softwareBudget>0 && quote.softwareAreaId===areaId) {
-          d.push([areaId==="__unassigned__"?"":""  , "Software", "Software Budget (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareBudget]);
+          d.push([areaId==="__unassigned__"?"":""  , "Software", "Software Budget — Sell Price (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareSell||swSell]);
         }
-        d.push(["", `${areaName} Subtotal`, "", "", "", "", "", areaTotal + (quote.softwareBudget>0&&quote.softwareAreaId===areaId?quote.softwareBudget:0)]);
+        d.push(["", `${areaName} Subtotal`, "", "", "", "", "", areaTotal + (quote.softwareBudget>0&&quote.softwareAreaId===areaId?quote.softwareSell||quote.softwareBudget:0)]);
         d.push([]);
       });
       // Unassigned software
       if (quote.softwareBudget>0 && !quote.softwareAreaId) {
-        d.push(["— Unassigned —", "Software", "Software Budget (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareBudget]);
+        d.push(["— Unassigned —", "Software", "Software Budget (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareSell||quote.softwareBudget]);
         d.push([]);
       }
     }
+
+    // Helpers for sell price calc if loading an older quote without softwareSell stored
+    const swSell = quote.softwareSell || (quote.softwareBudget>0 ? Math.round(quote.softwareBudget * 1.03 / 0.77) : 0);
+    const swCont = quote.softwareBudget>0 ? Math.round(quote.softwareBudget * 0.03) : 0;
+    const swMgn  = swSell - quote.softwareBudget - swCont;
 
     // Budget Summary
     d.push([]);
@@ -490,18 +500,20 @@ function App() {
     d.push(["Mech / Elec / Controls — Turnkey Subtotal", "", "", "", "", "", "", quote.equipTotal]);
     d.push([`  └ Internal Blended Margin (${INTERNAL_MECH_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalMechAmt||Math.round(quote.equipTotal*0.25)]);
     if (quote.softwareBudget>0) {
-      d.push(["Software Budget (WMS / WCS / LMS)", "", "", "", "", "", "", quote.softwareBudget]);
+      d.push(["Software — Cost Basis (entered)", "", "", "", "", "", "", quote.softwareBudget]);
+      d.push([`  └ + Contingency (${BASE_CONT_PCT}%)`, "", "", "", "", "", "", swCont]);
+      d.push([`  └ + Customer Margin (${BASE_MARGIN_PCT}% on sell)`, "", "", "", "", "", "", swMgn]);
+      d.push(["Software — Sell Price (flows into total)", "", "", "", "", "", "", swSell]);
       d.push([`  └ Internal Blended Margin (${INTERNAL_SW_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalSwAmt||Math.round(quote.softwareBudget*0.55)]);
-      d.push([`  └ Customer Margin (${BASE_MARGIN_PCT}%) + Contingency (${BASE_CONT_PCT}%) — informational`, "", "", "", "", "", "", Math.round(quote.softwareBudget * (BASE_MARGIN_PCT + BASE_CONT_PCT) / 100)]);
-      d.push(["Combined Subtotal (Equip + Software)", "", "", "", "", "", "", quote.subWithSW]);
+      d.push(["Combined Subtotal (Equip + Software Sell Price)", "", "", "", "", "", "", quote.subWithSW]);
     }
     d.push([`Freight & Rigging (${quote.freightPct}%)`, "", "", "", "", "", "", quote.freightAmt]);
     if (quote.contingency>0) d.push([`Additional Contingency (${quote.contingency}%)`, "", "", "", "", "", "", quote.addlContAmt]);
     if (quote.marginPct>0)   d.push([`Additional Customer Margin (${quote.marginPct}%)`, "", "", "", "", "", "", quote.addlMarginAmt]);
     d.push(["TOTAL ROM ESTIMATE", "", "", "", "", "", "", quote.grand]);
     d.push([]);
-    d.push([`Customer-facing pricing already includes ${BASE_MARGIN_PCT}% margin + ${BASE_CONT_PCT}% contingency baked into catalog unit prices.`]);
-    d.push(["Internal blended margins shown above are informational only — they do not change the totals."]);
+    d.push([`Catalog prices include ${BASE_MARGIN_PCT}% customer margin + ${BASE_CONT_PCT}% contingency. Software cost is grossed up: cost × 1.03 / (1 − 0.23).`]);
+    d.push(["Internal blended margins are informational only — they do not change the totals."]);
     d.push(["DISCLAIMER: ROM estimates ±20%. For planning purposes only — not a formal quotation."]);
 
     const ws = XLSX.utils.aoa_to_sheet(d);
@@ -519,7 +531,7 @@ function App() {
       quoteAreas.forEach(area => {
         const aLines = quote.lines.filter(l=>l.areaId===area.id);
         const aEquip = aLines.reduce((s,l)=>s+l.subtotal,0);
-        const aSW    = (quote.softwareBudget>0 && quote.softwareAreaId===area.id) ? quote.softwareBudget : 0;
+        const aSW    = (quote.softwareBudget>0 && quote.softwareAreaId===area.id) ? (quote.softwareSell||swSell) : 0;
         const aTotal = aEquip + aSW;
         areaGrandTotal += aTotal;
         ad.push([area.name, aEquip, aSW||"", aTotal]);
@@ -527,7 +539,7 @@ function App() {
       // Unassigned
       const unLines = quote.lines.filter(l=>!l.areaId);
       const unEquip = unLines.reduce((s,l)=>s+l.subtotal,0);
-      const unSW    = (quote.softwareBudget>0 && !quote.softwareAreaId) ? quote.softwareBudget : 0;
+      const unSW    = (quote.softwareBudget>0 && !quote.softwareAreaId) ? (quote.softwareSell||swSell) : 0;
       if (unEquip+unSW > 0) {
         ad.push(["— Unassigned —", unEquip, unSW||"", unEquip+unSW]);
         areaGrandTotal += unEquip + unSW;
@@ -602,7 +614,7 @@ function App() {
         <div style={{marginTop:"8px",padding:"8px 10px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"4px"}}>
           <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.08em",marginBottom:"2px"}}>⬡ PRICING NOTE</div>
           <div style={{fontSize:"11px",color:TEXTDIM,lineHeight:1.5}}>
-            Catalog prices include an internal blended margin of <span style={{color:GOLD}}>{INTERNAL_MECH_MGN_PCT}%</span> (Mech/Elec/Controls), plus a customer-facing <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin</span> and <span style={{color:GOLD}}>{BASE_CONT_PCT}% contingency</span>. Software carries a <span style={{color:"#9B5DE5"}}>{INTERNAL_SW_MGN_PCT}%</span> internal blended margin plus the same <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% / {BASE_CONT_PCT}%</span> customer margin &amp; contingency.
+            Catalog prices include an internal blended margin of <span style={{color:GOLD}}>{INTERNAL_MECH_MGN_PCT}%</span> (Mech/Elec/Controls), plus a customer-facing <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin</span> and <span style={{color:GOLD}}>{BASE_CONT_PCT}% contingency</span>. Software carries a <span style={{color:"#9B5DE5"}}>{INTERNAL_SW_MGN_PCT}%</span> internal blended margin. Software cost you enter is grossed up to a sell price using <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin on sell + {BASE_CONT_PCT}% contingency</span>.
           </div>
         </div>
       </div>
@@ -792,7 +804,7 @@ function App() {
               const areaLines = area.id==="__unassigned__"
                 ? computedLines.filter(l=>!l.areaId)
                 : computedLines.filter(l=>l.areaId===area.id);
-              const areaSW = area.id==="__unassigned__" ? (softwareAreaId?0:softwareBudget) : (softwareAreaId===area.id?softwareBudget:0);
+              const areaSW = area.id==="__unassigned__" ? (softwareAreaId?0:softwareSell) : (softwareAreaId===area.id?softwareSell:0);
               if (!areaLines.length && !areaSW) return null;
               const areaTotal = areaLines.reduce((s,l)=>s+l.subtotal,0) + areaSW;
               const color = area.id==="__unassigned__" ? FADE : AREA_COLOR;
@@ -805,7 +817,7 @@ function App() {
                   {areaLines.map(line=><LineRow key={line.instanceId} line={line} showArea={false} />)}
                   {areaSW>0&&(
                     <div style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{fontSize:"13px",color:"#9B5DE5"}}>Software Budget (WMS/WCS/LMS)</span>
+                      <span style={{fontSize:"13px",color:"#9B5DE5"}}>Software Budget — Sell Price (WMS/WCS/LMS)</span>
                       <span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(areaSW)}</span>
                     </div>
                   )}
@@ -841,39 +853,53 @@ function App() {
             )}
           </div>
 
-          {/* Software Budget + internal margin — always visible */}
+          {/* Software Budget — user enters cost, tool grosses up to sell price */}
           <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(155,93,229,0.04)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
               <div>
                 <span style={{fontSize:"13px",color:"#8A8880"}}>Software Budget</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS</div>
+                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS — enter your cost basis</div>
               </div>
-              {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareBudget)}</span>}
+              {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareSell)}</span>}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
               <span style={{fontSize:"11px",color:MUTE}}>$</span>
               <input value={softwareRaw} onChange={e=>setSoftwareRaw(e.target.value)}
                 onBlur={()=>{const n=parseFloat(softwareRaw.replace(/,/g,""));const val=(!isNaN(n)&&n>=0)?n:0;setSoftwareBudget(val);setSoftwareRaw(val>0?val.toLocaleString():"");}}
-                placeholder="Enter software budget..." inputMode="decimal"
+                placeholder="Enter software cost (before margin)..." inputMode="decimal"
                 style={{flex:1,background:BGROW,border:"1px solid #9B5DE560",borderRadius:"3px",padding:"6px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
               {softwareBudget>0&&<button onClick={()=>{setSoftwareBudget(0);setSoftwareRaw("");setSoftwareAreaId(null);}} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"5px 8px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Clear</button>}
             </div>
+            {softwareBudget>0&&(
+              <>
+                <div style={{marginTop:"10px",padding:"9px 11px",background:"rgba(155,93,229,0.06)",border:"1px solid rgba(155,93,229,0.18)",borderRadius:"5px",fontSize:"11px",lineHeight:1.8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",color:TEXTDIM}}>
+                    <span>Cost basis (entered)</span>
+                    <span>{fmtFull(softwareBudget)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",color:"#9B5DE5"}}>
+                    <span>+ Contingency ({BASE_CONT_PCT}%)</span>
+                    <span>+{fmtFull(swContAmt)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",color:"#9B5DE5"}}>
+                    <span>+ Customer margin ({BASE_MARGIN_PCT}% on sell)</span>
+                    <span>+{fmtFull(swMarginAmt)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",color:TEXT,borderTop:`1px solid rgba(155,93,229,0.2)`,marginTop:"4px",paddingTop:"4px"}}>
+                    <span style={{fontWeight:"bold"}}>Software sell price</span>
+                    <span style={{fontStyle:"italic",color:"#9B5DE5"}}>{fmtFull(softwareSell)}</span>
+                  </div>
+                </div>
+                <div style={{marginTop:"6px",padding:"7px 10px",background:"rgba(155,93,229,0.04)",border:"1px solid rgba(155,93,229,0.14)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:"11px",color:"#9B5DE5"}}>⬡ Internal blended margin ({INTERNAL_SW_MGN_PCT}% — informational)</span>
+                  <span style={{fontSize:"12px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(internalSwAmt)}</span>
+                </div>
+              </>
+            )}
             {softwareBudget>0&&areas.length>0&&(
               <div style={{marginTop:"8px",display:"flex",alignItems:"center",gap:"8px"}}>
                 <span style={{fontSize:"11px",color:FADE}}>Area:</span>
                 <AreaSelect value={softwareAreaId} onChange={setSoftwareAreaId} />
-              </div>
-            )}
-            {softwareBudget>0&&(
-              <div style={{marginTop:"8px",display:"flex",flexDirection:"column",gap:"4px"}}>
-                <div style={{padding:"7px 10px",background:"rgba(155,93,229,0.06)",border:"1px solid rgba(155,93,229,0.2)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontSize:"11px",color:"#9B5DE5"}}>⬡ Internal blended margin ({INTERNAL_SW_MGN_PCT}% Software)</span>
-                  <span style={{fontSize:"12px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(internalSwAmt)}</span>
-                </div>
-                <div style={{padding:"7px 10px",background:"rgba(255,191,0,0.04)",border:"1px solid rgba(255,191,0,0.15)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontSize:"11px",color:GOLD}}>⬡ Customer margin ({BASE_MARGIN_PCT}%) + contingency ({BASE_CONT_PCT}%) baked in</span>
-                  <span style={{fontSize:"12px",color:GOLD,fontStyle:"italic"}}>{fmtFull(softwareBudget * (BASE_MARGIN_PCT + BASE_CONT_PCT) / 100)}</span>
-                </div>
               </div>
             )}
           </div>
@@ -963,7 +989,7 @@ function App() {
         {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"New quote saved"} successfully</div>}
 
         <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-          <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are ROM estimates ±20% and include an internal blended margin of {INTERNAL_MECH_MGN_PCT}% (Mech/Elec/Controls) plus a customer-facing {BASE_MARGIN_PCT}% margin and {BASE_CONT_PCT}% contingency. Software carries a {INTERNAL_SW_MGN_PCT}% internal blended margin plus the same {BASE_MARGIN_PCT}% customer margin and {BASE_CONT_PCT}% contingency baked in. Internal margins are informational and do not change totals. For planning purposes only — not a formal quotation.
+          <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are ROM estimates ±20% and include an internal blended margin of {INTERNAL_MECH_MGN_PCT}% (Mech/Elec/Controls) plus a customer-facing {BASE_MARGIN_PCT}% margin and {BASE_CONT_PCT}% contingency. Software cost entered is grossed up to a sell price using the same {BASE_MARGIN_PCT}% margin on sell and {BASE_CONT_PCT}% contingency (formula: cost × 1.0{BASE_CONT_PCT} / (1 − 0.{BASE_MARGIN_PCT})). Software also carries a {INTERNAL_SW_MGN_PCT}% internal blended margin shown for reference only. For planning purposes only — not a formal quotation.
         </div>
       </div>
     </div>
