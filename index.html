@@ -11,27 +11,34 @@
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; width: 100%; overflow: hidden; }
-    body { background: #0D0F14; color: #DDD9D0; font-family: Georgia,'Times New Roman',serif; }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #090B0F; }
-    ::-webkit-scrollbar-thumb { background: #1C2030; border-radius: 3px; }
-    #install-banner {
-      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
-      background: linear-gradient(135deg,#1a1200,#0f0800);
-      border-bottom: 1px solid rgba(255,191,0,0.4);
-      padding: 10px 16px; align-items: center; justify-content: space-between; gap: 12px;
-      font-family: Georgia,serif;
-    }
-    #install-banner.show { display: flex; }
-    #install-banner .msg { font-size: 13px; color: #DDD9D0; flex: 1; }
-    #install-banner .msg span { color: #FFBF00; font-weight: bold; }
-    #install-btn { padding: 7px 16px; background: rgba(255,191,0,0.2); border: 1px solid rgba(255,191,0,0.6); border-radius: 4px; color: #FFBF00; font-size: 12px; letter-spacing: 0.08em; cursor: pointer; font-family: Georgia,serif; white-space: nowrap; }
-    #install-dismiss { background: transparent; border: none; color: #5A5850; font-size: 16px; cursor: pointer; padding: 2px 6px; }
-    select option { background: #141820; color: #DDD9D0; }
-  </style>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+  body { 
+    background: #FFFFFF; 
+    color: #1F2937; 
+    font-family: Georgia,'Times New Roman',serif; 
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #F1F5F9; }
+  ::-webkit-scrollbar-thumb { background: #94A3B8; border-radius: 3px; }
+
+  #install-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+    background: linear-gradient(135deg,#0A2540,#1E40AF);
+    border-bottom: 1px solid rgba(0,163,224,0.3);
+    padding: 10px 16px; align-items: center; justify-content: space-between; gap: 12px;
+    font-family: Georgia,serif; color: white;
+  }
+  #install-banner.show { display: flex; }
+  #install-btn { 
+    padding: 7px 16px; background: #00A3E0; border: none; 
+    border-radius: 4px; color: white; font-size: 12px; 
+    letter-spacing: 0.08em; cursor: pointer; font-family: Georgia,serif; 
+  }
+  #install-dismiss { background: transparent; border: none; color: white; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+  select option { background: #FFFFFF; color: #1F2937; }
+</style>
 </head>
 <body>
 
@@ -1126,7 +1133,7 @@ const updateQty = (instanceId, newRaw) => {
       {saveModal}
      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:"50px",borderBottom:`1px solid ${BORDER}`,background:"#0A2540",color:"white",flexShrink:0,gap:"10px"}}>
         <div style={{display:"flex",alignItems:"center",gap:"9px",flexShrink:0}}>
-         <div style={{width:"20px",height:"20px",background:"linear-gradient(135deg,#00A3E0,#0A2540)",clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)"}} />
+<div style={{width:"20px",height:"20px",background:"linear-gradient(135deg,#00A3E0,#0A2540)",clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)"}} />
           <span style={{fontSize:mobile?"13px":"15px",letterSpacing:"0.06em",fontWeight:"bold",whiteSpace:"nowrap"}}>
             RULE OF THUMB <span style={{color:ACCENT,fontStyle:"italic"}}>BUDGET TOOL</span>
           </span>
@@ -1136,7 +1143,7 @@ const updateQty = (instanceId, newRaw) => {
             {nameEditor(false)}<span style={{fontSize:"10px",color:MUTE}}>✎</span>
           </div>
         )}
-        <div style={{display:"flex",alignItems:"center",gap:"5px",background:"rgba(255,107,53,0.1)",border:"1px solid rgba(255,107,53,0.3)",borderRadius:"20px",padding:"4px 10px",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:"5px",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:"20px",padding:"4px 10px",flexShrink:0}}>
           <span style={{fontSize:"10px",color:"#8A8880"}}>TOTAL</span>
           <span style={{fontSize:"14px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</span>
         </div>
@@ -1173,4 +1180,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>
-
