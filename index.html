@@ -218,11 +218,11 @@ const INTERNAL_SW_MGN_PCT    = 55;   // internal blended margin on Software (inf
 const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
 const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
 
-// Hy-Tek inspired colors - White background
+// Clean White + Hy-Tek Colors
 const BG="#FFFFFF", BGDEEP="#0A2540", BGCARD="#F8FAFC", BGROW="#FFFFFF", 
       BORDER="#E2E8F0", BORDER2="#CBD5E1",
       TEXT="#1F2937", TEXTDIM="#64748B", MUTE="#94A3B8", FADE="#64748B", 
-      ACCENT="#FF6B35", GOLD="#FF8C00";
+      ACCENT="#00A3E0", GOLD="#FF8C00";
 
 const CUSTOM_COLOR = "#00A3E0";
 const AREA_COLOR   = "#0A2540";
@@ -1124,9 +1124,9 @@ const updateQty = (instanceId, newRaw) => {
   return (
     <div ref={containerRef} style={{height:"100vh",display:"flex",flexDirection:"column",background:BG,fontFamily:"Georgia,'Times New Roman',serif",color:TEXT,overflow:"hidden"}}>
       {saveModal}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:"50px",borderBottom:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0,gap:"10px"}}>
+     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:"50px",borderBottom:`1px solid ${BORDER}`,background:"#0A2540",color:"white",flexShrink:0,gap:"10px"}}>
         <div style={{display:"flex",alignItems:"center",gap:"9px",flexShrink:0}}>
-          <div style={{width:"20px",height:"20px",background:"linear-gradient(135deg,#FF6B35,#FFBF00)",clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)"}} />
+         <div style={{width:"20px",height:"20px",background:"linear-gradient(135deg,#00A3E0,#0A2540)",clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)"}} />
           <span style={{fontSize:mobile?"13px":"15px",letterSpacing:"0.06em",fontWeight:"bold",whiteSpace:"nowrap"}}>
             RULE OF THUMB <span style={{color:ACCENT,fontStyle:"italic"}}>BUDGET TOOL</span>
           </span>
