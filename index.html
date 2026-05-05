@@ -216,16 +216,14 @@ const CATALOG = [
   ]},
 ];
 
-// ── Rate constants ────────────────────────────────────────────────────────────
-const BASE_MARGIN_PCT        = 23;   // customer-facing margin baked into catalog prices
-const BASE_CONT_PCT          = 3;    // contingency baked into catalog prices
-const INTERNAL_MECH_MGN_PCT  = 25;   // internal blended margin on Mech/Elec/Controls (informational)
-const INTERNAL_SW_MGN_PCT    = 55;   // internal blended margin on Software (informational)
+const BASE_MARGIN_PCT        = 23;   
+const BASE_CONT_PCT          = 3;    
+const INTERNAL_MECH_MGN_PCT  = 25;   
+const INTERNAL_SW_MGN_PCT    = 55;   
 
 const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
 const fmtFull = (n) => "$" + Math.round(n).toLocaleString();
 
-// Clean White + Hy-Tek Colors
 const BG="#FFFFFF", BGDEEP="#0A2540", BGCARD="#F8FAFC", BGROW="#FFFFFF", 
       BORDER="#E2E8F0", BORDER2="#CBD5E1",
       TEXT="#1F2937", TEXTDIM="#64748B", MUTE="#94A3B8", FADE="#64748B", 
@@ -245,9 +243,9 @@ function App() {
   const [width, setWidth]       = useState(900);
   const [mobileTab, setMobileTab] = useState("catalog");
   const [lines, setLines]       = useState([]);
-  const [areas, setAreas]       = useState([]);       // [{id, name}]
+  const [areas, setAreas]       = useState([]);       
   const [newAreaName, setNewAreaName] = useState("");
-  const [budgetView, setBudgetView]   = useState("category"); // "category" | "area"
+  const [budgetView, setBudgetView]   = useState("category"); 
   const [expanded, setExpanded] = useState({"Conveyor":true});
   const [contingency, setContingency]   = useState(0);
   const [freightPct, setFreightPct]     = useState(5);
@@ -287,7 +285,6 @@ function App() {
 
   const mobile = width < 680;
 
-  // ── Area management ───────────────────────────────────────────────────────
   const addArea = () => {
     const name = newAreaName.trim();
     if (!name) return;
@@ -303,16 +300,18 @@ function App() {
   const renameArea = (areaId, name) => setAreas(prev => prev.map(a => a.id===areaId?{...a,name}:a));
   const setLineArea = (instanceId, areaId) => setLines(prev => prev.map(l => l.instanceId===instanceId?{...l,areaId:areaId||null}:l));
 
-  // ── Item management ───────────────────────────────────────────────────────
   const addItem = (item) => {
     instanceCounter.current += 1;
-setLines(prev => [...prev, { 
-  instanceId: id, 
-  itemId: item.id, 
-  qty: item.defaultQty, 
-  raw: String(item.defaultQty), // Add this to track the text while typing
-  label: "" 
-}]);
+    const instanceId = `${item.id}_${instanceCounter.current}`;
+    setLines(prev => [...prev, { 
+      instanceId: instanceId, 
+      itemId: item.id, 
+      qty: item.defaultQty, 
+      raw: String(item.defaultQty),
+      label: "",
+      areaId: null
+    }]);
+  };
 
   const addCustomItem = () => {
     const name = customName.trim();
@@ -329,25 +328,24 @@ setLines(prev => [...prev, {
   };
 
   const removeInstance  = (instanceId) => setLines(prev => prev.filter(l => l.instanceId!==instanceId));
-// 1. Keeps the cursor steady while you type
-const updateQtyLocal = (instanceId, newRaw) => {
-  setLines(prev => prev.map(l => 
-    l.instanceId === instanceId ? { ...l, raw: newRaw } : l
-  ));
-};
+  
+  const updateQtyLocal = (instanceId, newRaw) => {
+    setLines(prev => prev.map(l => 
+      l.instanceId === instanceId ? { ...l, raw: newRaw } : l
+    ));
+  };
 
-// 2. Updates the math once you click away (onBlur)
-const commitQty = (instanceId) => {
-  setLines(prev => prev.map(l => {
-    if (l.instanceId !== instanceId) return l;
-    const n = parseFloat(l.raw);
-    const validQty = (!isNaN(n) && n >= 0) ? n : l.qty;
-    return { ...l, qty: validQty, raw: String(validQty) };
-  }));
-};
+  const commitQty = (instanceId) => {
+    setLines(prev => prev.map(l => {
+      if (l.instanceId !== instanceId) return l;
+      const n = parseFloat(l.raw);
+      const validQty = (!isNaN(n) && n >= 0) ? n : l.qty;
+      return { ...l, qty: validQty, raw: String(validQty) };
+    }));
+  };
+
   const updateLabel = (instanceId, label) => setLines(prev => prev.map(l => l.instanceId===instanceId?{...l,label}:l));
 
-  // ── Load / Fork helpers ───────────────────────────────────────────────────
   const restoreLines = (quoteLines, baseCounter) => {
     const restored = (quoteLines||[]).map((l,i) => {
       if (l.isCustom) return { instanceId:`custom_${baseCounter+i}`, itemId:`custom_${baseCounter+i}`, qty:l.qty, raw:String(l.qty), label:l.label||"", isCustom:true, customName:l.customName, customUnit:l.customUnit, customCost:l.customCost, areaId:l.areaId||null };
@@ -367,7 +365,6 @@ const commitQty = (instanceId) => {
     setSoftwareBudget(quote.softwareBudget||0);
     setSoftwareRaw(quote.softwareBudget>0?quote.softwareBudget.toLocaleString():"");
     setSoftwareAreaId(quote.softwareAreaId||null);
-    // restore areas
     if (quote.areas && quote.areas.length) {
       areaCounter.current = Math.max(...quote.areas.map(a=>parseInt(a.id.replace("area_",""))||0), areaCounter.current) + 1;
       setAreas(quote.areas);
@@ -394,7 +391,6 @@ const commitQty = (instanceId) => {
     setMobileTab("budget");
   };
 
-  // ── Computed values ───────────────────────────────────────────────────────
   const computedLines = useMemo(() => lines.map(l => {
     if (l.isCustom) return { ...l, item:{ name:l.customName, unit:l.customUnit, unitCost:l.customCost, note:"" }, cat:{ category:CUSTOM_CATEGORY, color:CUSTOM_COLOR }, subtotal:l.qty*l.customCost };
     const item=ITEM_MAP[l.itemId]; const cat=CAT_MAP[l.itemId];
@@ -402,11 +398,8 @@ const commitQty = (instanceId) => {
   }), [lines]);
 
   const equipTotal        = computedLines.reduce((s,l)=>s+l.subtotal,0);
-  // Internal blended margins (informational — do not change totals)
   const internalMechAmt   = equipTotal * (INTERNAL_MECH_MGN_PCT/100);
   const internalSwAmt     = softwareBudget * (INTERNAL_SW_MGN_PCT/100);
-  // Software sell price: user enters cost, we gross up via margin-on-sell + contingency
-  // Formula: cost × 1.03 / (1 - 0.23)
   const softwareSell      = softwareBudget > 0 ? softwareBudget * (1 + BASE_CONT_PCT/100) / (1 - BASE_MARGIN_PCT/100) : 0;
   const swContAmt         = softwareBudget > 0 ? softwareBudget * (BASE_CONT_PCT/100) : 0;
   const swMarginAmt       = softwareSell - softwareBudget - swContAmt;
@@ -428,7 +421,6 @@ const commitQty = (instanceId) => {
     setSoftwareBudget(0); setSoftwareRaw(""); setSoftwareAreaId(null); setEditingQuoteId(null);
   };
 
-  // ── Save ──────────────────────────────────────────────────────────────────
   const doSaveQuote = async () => {
     const quote = {
       id: editingQuoteId||Date.now(),
@@ -459,12 +451,10 @@ const commitQty = (instanceId) => {
     if (editingQuoteId===id) setEditingQuoteId(null);
   };
 
-  // ── Excel export ──────────────────────────────────────────────────────────
   const downloadExcel = (quote) => {
     const XLSX=window.XLSX; if(!XLSX){alert("Excel library not loaded yet.");return;}
     const wb = XLSX.utils.book_new();
 
-    // ── Sheet 1: Full Quote ────────────────────────────────────────────────
     const d = [
       ["RULE OF THUMB BUDGET TOOL — ROM Estimate, For Planning Purposes Only"],
       [],
@@ -474,7 +464,6 @@ const commitQty = (instanceId) => {
       [],
     ];
 
-    // By Category
     d.push(["LINE ITEMS BY CATEGORY"]);
     d.push(["CATEGORY","ITEM","DESCRIPTION/LABEL","AREA","UNIT","UNIT PRICE","QTY","SUBTOTAL"]);
     const byCat = {};
@@ -489,7 +478,6 @@ const commitQty = (instanceId) => {
       d.push([]);
     });
 
-    // By Area (only if areas exist)
     const quoteAreas = quote.areas || [];
     if (quoteAreas.length > 0) {
       d.push([]);
@@ -502,36 +490,32 @@ const commitQty = (instanceId) => {
         const areaName = areaId==="__unassigned__" ? "— Unassigned —" : (quoteAreas.find(a=>a.id===areaId)||{name:areaId}).name;
         const areaTotal = areaLines.reduce((s,l)=>s+l.subtotal,0);
         areaLines.forEach((l,idx)=>{ d.push([idx===0?areaName:"", l.category, l.name, l.label||"", l.unit, l.unitCost, l.qty, l.subtotal]); });
-        // Software in this area
         if (quote.softwareBudget>0 && quote.softwareAreaId===areaId) {
-          d.push([areaId==="__unassigned__"?"":""  , "Software", "Software Budget — Sell Price (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareSell||swSell]);
+          d.push([areaId==="__unassigned__"?"":""  , "Software", "Software Budget — Sell Price (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareSell]);
         }
-        d.push(["", `${areaName} Subtotal`, "", "", "", "", "", areaTotal + (quote.softwareBudget>0&&quote.softwareAreaId===areaId?quote.softwareSell||quote.softwareBudget:0)]);
+        d.push(["", `${areaName} Subtotal`, "", "", "", "", "", areaTotal + (quote.softwareBudget>0&&quote.softwareAreaId===areaId?quote.softwareSell:0)]);
         d.push([]);
       });
-      // Unassigned software
       if (quote.softwareBudget>0 && !quote.softwareAreaId) {
-        d.push(["— Unassigned —", "Software", "Software Budget (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareSell||quote.softwareBudget]);
+        d.push(["— Unassigned —", "Software", "Software Budget (WMS/WCS/LMS)", "", "LS", "", "", quote.softwareSell]);
         d.push([]);
       }
     }
 
-    // Helpers for sell price calc if loading an older quote without softwareSell stored
     const swSell = quote.softwareSell || (quote.softwareBudget>0 ? Math.round(quote.softwareBudget * 1.03 / 0.77) : 0);
     const swCont = quote.softwareBudget>0 ? Math.round(quote.softwareBudget * 0.03) : 0;
     const swMgn  = swSell - quote.softwareBudget - swCont;
 
-    // Budget Summary
     d.push([]);
     d.push(["BUDGET SUMMARY"]);
     d.push(["Mech / Elec / Controls — Turnkey Subtotal", "", "", "", "", "", "", quote.equipTotal]);
-    d.push([`  └ Internal Blended Margin (${INTERNAL_MECH_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalMechAmt||Math.round(quote.equipTotal*0.25)]);
+    d.push([`  └ Internal Blended Margin (${INTERNAL_MECH_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalMechAmt]);
     if (quote.softwareBudget>0) {
       d.push(["Software — Cost Basis (entered)", "", "", "", "", "", "", quote.softwareBudget]);
       d.push([`  └ + Contingency (${BASE_CONT_PCT}%)`, "", "", "", "", "", "", swCont]);
       d.push([`  └ + Customer Margin (${BASE_MARGIN_PCT}% on sell)`, "", "", "", "", "", "", swMgn]);
       d.push(["Software — Sell Price (flows into total)", "", "", "", "", "", "", swSell]);
-      d.push([`  └ Internal Blended Margin (${INTERNAL_SW_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalSwAmt||Math.round(quote.softwareBudget*0.55)]);
+      d.push([`  └ Internal Blended Margin (${INTERNAL_SW_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalSwAmt]);
       d.push(["Combined Subtotal (Equip + Software Sell Price)", "", "", "", "", "", "", quote.subWithSW]);
     }
     d.push([`Freight & Rigging (${quote.freightPct}%)`, "", "", "", "", "", "", quote.freightAmt]);
@@ -547,7 +531,6 @@ const commitQty = (instanceId) => {
     ws["!cols"] = [{wch:52},{wch:36},{wch:22},{wch:18},{wch:8},{wch:14},{wch:8},{wch:16}];
     XLSX.utils.book_append_sheet(wb, ws, "Quote");
 
-    // ── Sheet 2: Area Summary (if areas exist) ─────────────────────────────
     if (quoteAreas.length > 0) {
       const ad = [
         ["AREA SUMMARY — " + quote.projectName],
@@ -558,28 +541,24 @@ const commitQty = (instanceId) => {
       quoteAreas.forEach(area => {
         const aLines = quote.lines.filter(l=>l.areaId===area.id);
         const aEquip = aLines.reduce((s,l)=>s+l.subtotal,0);
-        const aSW    = (quote.softwareBudget>0 && quote.softwareAreaId===area.id) ? (quote.softwareSell||swSell) : 0;
+        const aSW    = (quote.softwareBudget>0 && quote.softwareAreaId===area.id) ? quote.softwareSell : 0;
         const aTotal = aEquip + aSW;
         areaGrandTotal += aTotal;
         ad.push([area.name, aEquip, aSW||"", aTotal]);
       });
-      // Unassigned
       const unLines = quote.lines.filter(l=>!l.areaId);
       const unEquip = unLines.reduce((s,l)=>s+l.subtotal,0);
-      const unSW    = (quote.softwareBudget>0 && !quote.softwareAreaId) ? (quote.softwareSell||swSell) : 0;
+      const unSW    = (quote.softwareBudget>0 && !quote.softwareAreaId) ? quote.softwareSell : 0;
       if (unEquip+unSW > 0) {
         ad.push(["— Unassigned —", unEquip, unSW||"", unEquip+unSW]);
         areaGrandTotal += unEquip + unSW;
       }
       ad.push(["TOTAL", "", "", areaGrandTotal]);
-      ad.push([]);
-      ad.push(["Note: Area totals reflect equipment + software only, before freight/contingency/margin."]);
       const ws2 = XLSX.utils.aoa_to_sheet(ad);
       ws2["!cols"] = [{wch:30},{wch:22},{wch:16},{wch:16}];
       XLSX.utils.book_append_sheet(wb, ws2, "By Area");
     }
 
-    // ── Sheet 3: Saved Quotes Index ────────────────────────────────────────
     const idx = [["SAVED QUOTES"],[],["Date","Project","Customer","Prepared By","Total"],...savedQuotes.map(q=>[q.date,q.projectName,q.customer,q.user,q.grand])];
     const ws3 = XLSX.utils.aoa_to_sheet(idx);
     ws3["!cols"] = [{wch:14},{wch:28},{wch:24},{wch:20},{wch:16}];
@@ -589,28 +568,12 @@ const commitQty = (instanceId) => {
   };
 
   const nameEditor = (small) => editingName ? (
-    <input 
-  value={line.raw} 
-  onChange={(e) => updateQtyLocal(line.instanceId, e.target.value)}
-  onBlur={() => commitQty(line.instanceId)}
-  inputMode="decimal"
-  style={{
-    width: "58px",
-    textAlign: "right",
-    background: "#FFFFFF",
-    border: "1px solid #CBD5E1",
-    borderRadius: "3px",
-    padding: "4px 6px",
-    color: "#1F2937",
-    fontSize: "13px",
-    outline: "none"
-  }} 
-/>
+    <input value={projName} onChange={e=>setProjName(e.target.value)} onBlur={()=>setEditingName(false)} onKeyDown={e=>e.key==="Enter"&&setEditingName(false)} autoFocus
+      style={{background:BGROW,border:`1px solid ${BORDER2}`,borderRadius:"3px",padding:"4px 8px",color:TEXT,fontSize:small?"13px":"14px",fontFamily:"Georgia,serif",outline:"none",width:"200px"}} />
   ) : (
     <span onClick={()=>setEditingName(true)} style={{fontSize:small?"13px":"14px",color:small?TEXTDIM:TEXT,cursor:"text",borderBottom:`1px dashed ${BORDER}`}}>{projName}</span>
   );
 
-  // ── Area selector used on each line ──────────────────────────────────────
   const AreaSelect = ({value, onChange}) => (
     <select value={value||""} onChange={e=>onChange(e.target.value||null)}
       style={{background:BGROW,border:`1px solid ${value?AREA_COLOR+"60":BORDER2}`,borderRadius:"3px",padding:"3px 6px",color:value?AREA_COLOR:FADE,fontSize:"11px",fontFamily:"Georgia,serif",outline:"none",maxWidth:"120px"}}>
@@ -619,7 +582,6 @@ const commitQty = (instanceId) => {
     </select>
   );
 
-  // ── Line row renderer (shared between category and area views) ───────────
   const LineRow = ({line, showArea=true}) => (
     <div key={line.instanceId} style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
@@ -639,35 +601,24 @@ const commitQty = (instanceId) => {
         )}
         <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
           <span style={{fontSize:"10px",color:FADE}}>QTY</span>
-         <input 
-  value={line.raw} 
-  onChange={e => updateQty(line.instanceId, e.target.value)}
-  onBlur={() => {
-    const n = parseFloat(line.raw);
-    const qty = (!isNaN(n) && n >= 0) ? n : line.qty;
-    setLines(prev => prev.map(l => l.instanceId === line.instanceId ? {...l, qty, raw: String(qty)} : l));
-  }}
-  inputMode="decimal"
-  style={{width:"58px",textAlign:"right",background:BGROW,border:`1px solid ${line.isCustom?CUSTOM_COLOR+"40":BORDER2}`,borderRadius:"3px",padding:"4px 6px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} 
-/>
+          <input 
+            value={line.raw} 
+            onChange={(e) => updateQtyLocal(line.instanceId, e.target.value)}
+            onBlur={() => commitQty(line.instanceId)}
+            inputMode="decimal"
+            style={{width:"58px",textAlign:"right",background:BGROW,border:`1px solid ${line.isCustom?CUSTOM_COLOR+"40":BORDER2}`,borderRadius:"3px",padding:"4px 6px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} 
+          />
         </div>
         <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic",minWidth:"74px",textAlign:"right"}}>{fmtFull(line.subtotal)}</div>
       </div>
     </div>
   );
 
-  // ── Catalog Panel ─────────────────────────────────────────────────────────
   const catalogPanel = (
     <div style={{flex:1,overflowY:"auto",background:BG,minHeight:0}}>
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>EQUIPMENT & SERVICES CATALOG</div>
         <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>Click + to add · add same item multiple times</div>
-        <div style={{marginTop:"8px",padding:"8px 10px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"4px"}}>
-          <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.08em",marginBottom:"2px"}}>⬡ PRICING NOTE</div>
-          <div style={{fontSize:"11px",color:TEXTDIM,lineHeight:1.5}}>
-            Catalog prices include an internal blended margin of <span style={{color:GOLD}}>{INTERNAL_MECH_MGN_PCT}%</span> (Mech/Elec/Controls), plus a customer-facing <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin</span> and <span style={{color:GOLD}}>{BASE_CONT_PCT}% contingency</span>. Software carries a <span style={{color:"#9B5DE5"}}>{INTERNAL_SW_MGN_PCT}%</span> internal blended margin. Software cost you enter is grossed up to a sell price using <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin on sell + {BASE_CONT_PCT}% contingency</span>.
-          </div>
-        </div>
       </div>
 
       {CATALOG.map(cat=>{
@@ -676,7 +627,7 @@ const commitQty = (instanceId) => {
         return (
           <div key={cat.category} style={{borderBottom:`1px solid ${BORDER}`}}>
             <div onClick={e=>{e.preventDefault();setExpanded(p=>({...p,[cat.category]:!p[cat.category]}));}}
-              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",background:open?"#101420":"transparent"}}>
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",background:open?"#F1F5F9":"transparent"}}>
               <div style={{display:"flex",alignItems:"center",gap:"8px",minWidth:0}}>
                 <span style={{color:cat.color,fontSize:"14px",flexShrink:0}}>{cat.icon}</span>
                 <span style={{fontSize:"12px",fontWeight:"bold",letterSpacing:"0.04em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cat.category.toUpperCase()}</span>
@@ -689,7 +640,7 @@ const commitQty = (instanceId) => {
               return (
                 <div key={item.id} style={{padding:"9px 14px 9px 28px",background:count>0?cat.color+"0D":"transparent",borderLeft:count>0?`3px solid ${cat.color}`:"3px solid transparent",borderBottom:`1px solid ${BGROW}`}}>
                   <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-                    <button onClick={()=>addItem(item)} style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:BGDEEP,cursor:"pointer",fontWeight:"bold",lineHeight:1}}>+</button>
+                    <button onClick={()=>addItem(item)} style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,background:cat.color,border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",color:"white",cursor:"pointer",fontWeight:"bold",lineHeight:1}}>+</button>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:"13px",color:count>0?TEXT:TEXTDIM,lineHeight:1.3}}>{item.name}</div>
                       <div style={{fontSize:"11px",color:count>0?cat.color:FADE,marginTop:"2px"}}>{`${fmt(item.unitCost)} / ${item.unit}`}{item.note?` · ${item.note}`:""}</div>
@@ -703,10 +654,9 @@ const commitQty = (instanceId) => {
         );
       })}
 
-      {/* ── Custom Item Entry ────────────────────────────────────────────── */}
       <div style={{borderBottom:`1px solid ${BORDER}`}}>
         <div onClick={e=>{e.preventDefault();setExpanded(p=>({...p,"__custom__":!p["__custom__"]}));}}
-          style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",background:expanded["__custom__"]?"#101420":"transparent"}}>
+          style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",background:expanded["__custom__"]?"#F1F5F9":"transparent"}}>
           <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
             <span style={{color:CUSTOM_COLOR,fontSize:"14px"}}>✦</span>
             <span style={{fontSize:"12px",fontWeight:"bold",letterSpacing:"0.04em"}}>CUSTOM ITEMS</span>
@@ -716,10 +666,9 @@ const commitQty = (instanceId) => {
         </div>
         {expanded["__custom__"]&&(
           <div style={{padding:"14px 16px",background:"rgba(126,184,247,0.04)"}}>
-            <div style={{fontSize:"11px",color:TEXTDIM,marginBottom:"12px",lineHeight:1.5}}>Enter any item not in the catalog. Price you enter is used as-is.</div>
             <div style={{marginBottom:"10px"}}>
               <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE,marginBottom:"4px"}}>ITEM NAME</div>
-              <input value={customName} onChange={e=>setCustomName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomItem()} placeholder="e.g. Dock Levelers, Electrical Allowance..."
+              <input value={customName} onChange={e=>setCustomName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomItem()} placeholder="e.g. Dock Levelers..."
                 style={{width:"100%",background:BGROW,border:`1px solid ${CUSTOM_COLOR}40`,borderRadius:"3px",padding:"7px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
             </div>
             <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
@@ -751,41 +700,28 @@ const commitQty = (instanceId) => {
     </div>
   );
 
-  // ── Budget Panel ──────────────────────────────────────────────────────────
   const budgetPanel = (
-    <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
+    <div style={{flex:1,overflowY:"auto",background:BGCARD,minHeight:0}}>
       <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
-
-        {/* Editing / Fork banners */}
         {editingQuoteId&&(
           <div style={{marginBottom:"14px",padding:"9px 12px",background:"rgba(255,191,0,0.07)",border:"1px solid rgba(255,191,0,0.3)",borderRadius:"5px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
             <div style={{fontSize:"11px",color:GOLD}}>✎ Editing saved quote — save to update, or clear to start fresh</div>
             <button onClick={clearBuilder} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"3px 8px",cursor:"pointer",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}}>✕ Clear</button>
           </div>
         )}
-        {!editingQuoteId&&hasContent&&(
-          <div style={{marginBottom:"14px",padding:"9px 12px",background:"rgba(126,184,247,0.06)",border:"1px solid rgba(126,184,247,0.2)",borderRadius:"5px"}}>
-            <div style={{fontSize:"11px",color:CUSTOM_COLOR}}>⎘ Forked quote — make your changes then Save as a new quote</div>
-          </div>
-        )}
-
+        
         <div style={{marginBottom:"16px"}}>
           <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>ROM ESTIMATE</div>
           <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px"}}>{projName}</div>
-          <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% estimate</div>
         </div>
 
-        {/* ── Area Manager ─────────────────────────────────────────────── */}
-        <div style={{marginBottom:"18px",background:BGCARD,border:`1px solid ${AREA_COLOR}30`,borderRadius:"6px",overflow:"hidden"}}>
-          <div style={{padding:"8px 12px",borderBottom:`1px solid ${AREA_COLOR}20`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-              <span style={{fontSize:"11px",letterSpacing:"0.1em",color:AREA_COLOR}}>◫ FUNCTIONAL AREAS</span>
-              {areas.length>0&&<span style={{fontSize:"10px",color:FADE}}>· assign items below to group by area in Excel</span>}
-            </div>
+        <div style={{marginBottom:"18px",background:BGROW,border:`1px solid ${BORDER}`,borderRadius:"6px",overflow:"hidden"}}>
+          <div style={{padding:"8px 12px",borderBottom:`1px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
+            <span style={{fontSize:"11px",letterSpacing:"0.1em",color:AREA_COLOR}}>◫ FUNCTIONAL AREAS</span>
             {areas.length>0&&(
               <div style={{display:"flex",gap:"4px"}}>
                 {["category","area"].map(v=>(
-                  <button key={v} onClick={()=>setBudgetView(v)} style={{padding:"3px 9px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"10px",letterSpacing:"0.06em",background:budgetView===v?AREA_COLOR+"20":"transparent",border:budgetView===v?`1px solid ${AREA_COLOR}50`:`1px solid ${BORDER}`,color:budgetView===v?AREA_COLOR:FADE}}>
+                  <button key={v} onClick={()=>setBudgetView(v)} style={{padding:"3px 9px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"10px",background:budgetView===v?AREA_COLOR+"20":"transparent",border:budgetView===v?`1px solid ${AREA_COLOR}50`:`1px solid ${BORDER}`,color:budgetView===v?AREA_COLOR:FADE}}>
                     {v==="category"?"BY CAT":"BY AREA"}
                   </button>
                 ))}
@@ -805,23 +741,18 @@ const commitQty = (instanceId) => {
               </div>
             )}
             <div style={{display:"flex",gap:"6px"}}>
-              <input value={newAreaName} onChange={e=>setNewAreaName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addArea()} placeholder="New area name (e.g. Receiving, Shipping)..."
-                style={{flex:1,background:BGROW,border:`1px solid ${AREA_COLOR}40`,borderRadius:"3px",padding:"6px 10px",color:TEXT,fontSize:"12px",fontFamily:"Georgia,serif",outline:"none"}} />
+              <input value={newAreaName} onChange={e=>setNewAreaName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addArea()} placeholder="New area name..."
+                style={{flex:1,background:BGROW,border:`1px solid ${BORDER}`,borderRadius:"3px",padding:"6px 10px",color:TEXT,fontSize:"12px",fontFamily:"Georgia,serif",outline:"none"}} />
               <button onClick={addArea} style={{padding:"6px 14px",background:`rgba(184,224,160,0.15)`,border:`1px solid ${AREA_COLOR}50`,borderRadius:"3px",color:AREA_COLOR,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>+ Add</button>
             </div>
           </div>
         </div>
 
-        {/* ── Line items — by category or by area ──────────────────────── */}
-        {!hasContent&&(
+        {!hasContent?(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"120px",gap:"10px",color:FADE,textAlign:"center"}}>
-            <div style={{fontSize:"30px"}}>◻</div>
             <div style={{fontSize:"14px",fontStyle:"italic",color:MUTE}}>No items added yet</div>
-            <div style={{fontSize:"12px"}}>Browse the catalog and click + to add items</div>
           </div>
-        )}
-
-        {hasContent && budgetView==="category" && (
+        ) : budgetView==="category" ? (
           <>
             {CATALOG.map(cat=>{
               const catLines=computedLines.filter(l=>!l.isCustom&&l.cat.category===cat.category);
@@ -847,14 +778,10 @@ const commitQty = (instanceId) => {
               </div>
             )}
           </>
-        )}
-
-        {hasContent && budgetView==="area" && (
+        ) : (
           <>
             {[...areas, {id:"__unassigned__", name:"— Unassigned —"}].map(area=>{
-              const areaLines = area.id==="__unassigned__"
-                ? computedLines.filter(l=>!l.areaId)
-                : computedLines.filter(l=>l.areaId===area.id);
+              const areaLines = area.id==="__unassigned__" ? computedLines.filter(l=>!l.areaId) : computedLines.filter(l=>l.areaId===area.id);
               const areaSW = area.id==="__unassigned__" ? (softwareAreaId?0:softwareSell) : (softwareAreaId===area.id?softwareSell:0);
               if (!areaLines.length && !areaSW) return null;
               const areaTotal = areaLines.reduce((s,l)=>s+l.subtotal,0) + areaSW;
@@ -868,7 +795,7 @@ const commitQty = (instanceId) => {
                   {areaLines.map(line=><LineRow key={line.instanceId} line={line} showArea={false} />)}
                   {areaSW>0&&(
                     <div style={{padding:"9px 8px",borderBottom:`1px solid ${BGROW}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{fontSize:"13px",color:"#9B5DE5"}}>Software Budget — Sell Price (WMS/WCS/LMS)</span>
+                      <span style={{fontSize:"13px",color:"#9B5DE5"}}>Software Budget (Sell Price)</span>
                       <span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(areaSW)}</span>
                     </div>
                   )}
@@ -878,326 +805,127 @@ const commitQty = (instanceId) => {
           </>
         )}
 
-        {/* ── Budget Summary ────────────────────────────────────────────── */}
-        <div style={{marginTop:"20px",background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",borderBottom:`1px solid ${BORDER}`}}>
-            <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>BUDGET SUMMARY</div>
-          </div>
-
-          {/* Mech/Elec/Controls subtotal + internal margin */}
+        <div style={{marginTop:"20px",background:BGROW,border:`1px solid ${BORDER}`,borderRadius:"8px",overflow:"hidden"}}>
           <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-              <div style={{flex:1}}>
-                <span style={{fontSize:"13px",color:"#8A8880"}}>Mech / Elec / Controls Subtotal</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>Equip + install + commissioning + eng</div>
-                <div style={{marginTop:"6px",display:"inline-flex",alignItems:"center",gap:"6px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"3px",padding:"3px 8px"}}>
-                  <span style={{fontSize:"10px",color:GOLD}}>⬡ Includes customer {BASE_MARGIN_PCT}% margin + {BASE_CONT_PCT}% contingency</span>
-                </div>
-              </div>
-              <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT,flexShrink:0,paddingLeft:"12px"}}>{fmtFull(equipTotal)}</span>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:"13px",color:TEXTDIM}}>Mech / Elec / Controls Subtotal</span>
+              <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT}}>{fmtFull(equipTotal)}</span>
             </div>
-            {equipTotal>0&&(
-              <div style={{marginTop:"8px",padding:"7px 10px",background:"rgba(255,191,0,0.04)",border:"1px solid rgba(255,191,0,0.12)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:"11px",color:GOLD}}>⬡ Internal blended margin ({INTERNAL_MECH_MGN_PCT}% Mech/Elec/Controls)</span>
-                <span style={{fontSize:"12px",color:GOLD,fontStyle:"italic"}}>{fmtFull(internalMechAmt)}</span>
-              </div>
-            )}
           </div>
 
-          {/* Software Budget — user enters cost, tool grosses up to sell price */}
           <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(155,93,229,0.04)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-              <div>
-                <span style={{fontSize:"13px",color:"#8A8880"}}>Software Budget</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>WMS / WCS / LMS — enter your cost basis</div>
-              </div>
-              {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareSell)}</span>}
+              <span style={{fontSize:"13px",color:TEXTDIM}}>Software Budget (Cost Basis)</span>
+              {softwareBudget>0&&<span style={{fontSize:"14px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(softwareSell)} Sell</span>}
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-              <span style={{fontSize:"11px",color:MUTE}}>$</span>
-              <input value={softwareRaw} onChange={e=>setSoftwareRaw(e.target.value)}
-                onBlur={()=>{const n=parseFloat(softwareRaw.replace(/,/g,""));const val=(!isNaN(n)&&n>=0)?n:0;setSoftwareBudget(val);setSoftwareRaw(val>0?val.toLocaleString():"");}}
-                placeholder="Enter software cost (before margin)..." inputMode="decimal"
-                style={{flex:1,background:BGROW,border:"1px solid #9B5DE560",borderRadius:"3px",padding:"6px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
-              {softwareBudget>0&&<button onClick={()=>{setSoftwareBudget(0);setSoftwareRaw("");setSoftwareAreaId(null);}} style={{background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"3px",color:FADE,fontSize:"11px",padding:"5px 8px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Clear</button>}
-            </div>
-            {softwareBudget>0&&(
-              <>
-                <div style={{marginTop:"10px",padding:"9px 11px",background:"rgba(155,93,229,0.06)",border:"1px solid rgba(155,93,229,0.18)",borderRadius:"5px",fontSize:"11px",lineHeight:1.8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",color:TEXTDIM}}>
-                    <span>Cost basis (entered)</span>
-                    <span>{fmtFull(softwareBudget)}</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",color:"#9B5DE5"}}>
-                    <span>+ Contingency ({BASE_CONT_PCT}%)</span>
-                    <span>+{fmtFull(swContAmt)}</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",color:"#9B5DE5"}}>
-                    <span>+ Customer margin ({BASE_MARGIN_PCT}% on sell)</span>
-                    <span>+{fmtFull(swMarginAmt)}</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",color:TEXT,borderTop:`1px solid rgba(155,93,229,0.2)`,marginTop:"4px",paddingTop:"4px"}}>
-                    <span style={{fontWeight:"bold"}}>Software sell price</span>
-                    <span style={{fontStyle:"italic",color:"#9B5DE5"}}>{fmtFull(softwareSell)}</span>
-                  </div>
-                </div>
-                <div style={{marginTop:"6px",padding:"7px 10px",background:"rgba(155,93,229,0.04)",border:"1px solid rgba(155,93,229,0.14)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontSize:"11px",color:"#9B5DE5"}}>⬡ Internal blended margin ({INTERNAL_SW_MGN_PCT}% — informational)</span>
-                  <span style={{fontSize:"12px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(internalSwAmt)}</span>
-                </div>
-              </>
-            )}
-            {softwareBudget>0&&areas.length>0&&(
-              <div style={{marginTop:"8px",display:"flex",alignItems:"center",gap:"8px"}}>
-                <span style={{fontSize:"11px",color:FADE}}>Area:</span>
-                <AreaSelect value={softwareAreaId} onChange={setSoftwareAreaId} />
-              </div>
-            )}
+            <input value={softwareRaw} onChange={e=>setSoftwareRaw(e.target.value)}
+              onBlur={()=>{const n=parseFloat(softwareRaw.replace(/,/g,""));const val=(!isNaN(n)&&n>=0)?n:0;setSoftwareBudget(val);setSoftwareRaw(val>0?val.toLocaleString():"");}}
+              placeholder="Enter software cost..." inputMode="decimal"
+              style={{width:"100%",background:BGROW,border:"1px solid #9B5DE560",borderRadius:"3px",padding:"6px 10px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none"}} />
           </div>
 
-          {/* Combined subtotal (only shown when both exist) */}
-          {equipTotal>0&&softwareBudget>0&&(
-            <div style={{padding:"8px 14px",borderBottom:`1px solid ${BORDER}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:"12px",color:FADE}}>Combined Subtotal</span>
-              <span style={{fontSize:"13px",color:TEXTDIM,fontStyle:"italic"}}>{fmtFull(subWithSW)}</span>
-            </div>
-          )}
-
-          {/* Freight */}
           <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-              <div>
-                <span style={{fontSize:"13px",color:"#8A8880"}}>Freight & Rigging</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>% of turnkey subtotal</div>
-              </div>
-              <span style={{fontSize:"14px",color:"#00BBF9"}}>{fmtFull(freightAmt)}</span>
+              <span style={{fontSize:"13px",color:TEXTDIM}}>Freight & Rigging ({freightPct}%)</span>
+              <span style={{fontSize:"14px",color:"#00A3E0"}}>{fmtFull(freightAmt)}</span>
             </div>
-            <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:"6px"}}>
               {[3,4,5,6,8].map(p=>(
-                <button key={p} onClick={()=>setFreightPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"12px",background:freightPct===p?"rgba(0,187,249,0.15)":"transparent",border:freightPct===p?"1px solid rgba(0,187,249,0.5)":`1px solid ${BORDER}`,color:freightPct===p?"#00BBF9":FADE}}>{p}%</button>
+                <button key={p} onClick={()=>setFreightPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"12px",background:freightPct===p?"#00A3E020":"transparent",border:freightPct===p?"1px solid #00A3E0":"1px solid #E2E8F0",color:freightPct===p?"#00A3E0":FADE}}>{p}%</button>
               ))}
             </div>
-            <div style={{fontSize:"10px",color:FADE,marginTop:"6px"}}>3–4% light/small · 5–6% typical MHE · 8% heavy/robotic</div>
           </div>
 
-          {/* Additional Contingency */}
-          <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-              <div>
-                <span style={{fontSize:"13px",color:"#8A8880"}}>Additional Contingency</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>On top of baked-in {BASE_CONT_PCT}% · use for high-risk or early-stage projects</div>
-              </div>
-              <span style={{fontSize:"14px",color:GOLD}}>{addlContAmt>0?fmtFull(addlContAmt):<span style={{color:MUTE}}>—</span>}</span>
-            </div>
-            <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-              {[0,2,5,10,15,20].map(p=>(
-                <button key={p} onClick={()=>setContingency(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:contingency===p?"rgba(255,191,0,0.2)":"transparent",border:contingency===p?"1px solid rgba(255,191,0,0.5)":`1px solid ${BORDER}`,color:contingency===p?GOLD:FADE}}>{p===0?"None":`+${p}%`}</button>
-              ))}
-            </div>
-            {contingency>0&&<div style={{fontSize:"10px",color:GOLD,marginTop:"5px"}}>Total contingency: {BASE_CONT_PCT+contingency}% ({BASE_CONT_PCT}% baked-in + {contingency}% additional)</div>}
-          </div>
-
-          {/* Additional Margin */}
-          <div style={{padding:"11px 14px",borderBottom:`1px solid ${BORDER}`,background:"rgba(46,196,182,0.04)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-              <div>
-                <span style={{fontSize:"13px",color:"#8A8880"}}>Additional Customer Margin</span>
-                <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>On top of baked-in {BASE_MARGIN_PCT}% · use for complex scope or risk premium</div>
-              </div>
-              <span style={{fontSize:"14px",color:"#2EC4B6"}}>{addlMarginAmt>0?fmtFull(addlMarginAmt):<span style={{color:MUTE}}>—</span>}</span>
-            </div>
-            <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-              {[0,2,4,5,9,14,19].map(p=>(
-                <button key={p} onClick={()=>setMarginPct(p)} style={{padding:"4px 10px",borderRadius:"3px",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:"13px",background:marginPct===p?"rgba(46,196,182,0.2)":"transparent",border:marginPct===p?"1px solid rgba(46,196,182,0.5)":`1px solid ${BORDER}`,color:marginPct===p?"#2EC4B6":FADE}}>{p===0?"None":`+${p}%`}</button>
-              ))}
-            </div>
-            {marginPct>0&&<div style={{fontSize:"10px",color:"#2EC4B6",marginTop:"5px"}}>Total customer margin: {BASE_MARGIN_PCT+marginPct}% ({BASE_MARGIN_PCT}% baked-in + {marginPct}% additional)</div>}
-          </div>
-
-          {/* Grand Total */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"15px 14px",background:"linear-gradient(135deg,rgba(255,107,53,0.08),rgba(255,191,0,0.05))"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"15px 14px",background:"#F8FAFC"}}>
             <div>
               <div style={{fontSize:"10px",letterSpacing:"0.12em",color:MUTE}}>TOTAL ROM ESTIMATE</div>
-              <div style={{fontSize:"10px",color:FADE,marginTop:"2px"}}>ROM ±20% · incl. freight{contingency>0?` · +${contingency}% addl. contingency`:""}{marginPct>0?` · +${marginPct}% addl. margin`:""}</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:mobile?"22px":"26px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</div>
-              <div style={{fontSize:"11px",color:MUTE}}>{selCount} line items{softwareBudget>0?" + software":""}</div>
+              <div style={{fontSize:"22px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</div>
             </div>
           </div>
         </div>
 
-        {/* Save buttons */}
         <div style={{marginTop:"16px",display:"flex",gap:"10px"}}>
           <button onClick={()=>setShowSaveModal(true)}
-            style={{flex:1,padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.15)":"rgba(255,107,53,0.15)",border:editingQuoteId?"1px solid rgba(255,191,0,0.5)":"1px solid rgba(255,107,53,0.5)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
-            {editingQuoteId?"💾 UPDATE QUOTE":"💾 SAVE AS NEW QUOTE"}
-          </button>
-          {editingQuoteId&&(
-            <button onClick={clearBuilder} style={{padding:"12px 16px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"5px",color:FADE,fontSize:"13px",cursor:"pointer",fontFamily:"Georgia,serif"}}>✕ Clear</button>
-          )}
-        </div>
-        {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"New quote saved"} successfully</div>}
-
-        <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-          <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are ROM estimates ±20% and include an internal blended margin of {INTERNAL_MECH_MGN_PCT}% (Mech/Elec/Controls) plus a customer-facing {BASE_MARGIN_PCT}% margin and {BASE_CONT_PCT}% contingency. Software cost entered is grossed up to a sell price using the same {BASE_MARGIN_PCT}% margin on sell and {BASE_CONT_PCT}% contingency (formula: cost × 1.0{BASE_CONT_PCT} / (1 − 0.{BASE_MARGIN_PCT})). Software also carries a {INTERNAL_SW_MGN_PCT}% internal blended margin shown for reference only. For planning purposes only — not a formal quotation.
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Saved Quotes Panel ────────────────────────────────────────────────────
-  const savedPanel = (
-    <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
-      <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
-        <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>SAVED QUOTES</div>
-        <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>{savedQuotes.length} saved</div>
-      </div>
-      {savedQuotes.length===0?(
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"200px",gap:"10px",color:FADE,padding:"32px 20px",textAlign:"center"}}>
-          <div style={{fontSize:"30px"}}>📋</div>
-          <div style={{fontSize:"14px",fontStyle:"italic",color:MUTE}}>No saved quotes yet</div>
-          <div style={{fontSize:"12px"}}>Build a budget and click Save Quote</div>
-        </div>
-      ):savedQuotes.map(q=>(
-        <div key={q.id} style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,background:editingQuoteId===q.id?"rgba(255,191,0,0.04)":BGCARD,borderLeft:editingQuoteId===q.id?`3px solid ${GOLD}`:"3px solid transparent"}}>
-          {editingQuoteId===q.id&&<div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.1em",marginBottom:"6px"}}>✎ CURRENTLY EDITING</div>}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"8px"}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic"}}>{q.projectName}</div>
-              <div style={{fontSize:"11px",color:TEXTDIM,marginTop:"3px"}}>{q.customer} · {q.user}</div>
-              <div style={{display:"flex",gap:"8px",marginTop:"2px",flexWrap:"wrap"}}>
-                <span style={{fontSize:"10px",color:FADE}}>{q.date}</span>
-                {q.areas&&q.areas.length>0&&<span style={{fontSize:"10px",color:AREA_COLOR}}>◫ {q.areas.length} area{q.areas.length>1?"s":""}</span>}
-              </div>
-            </div>
-            <div style={{textAlign:"right",flexShrink:0}}>
-              <div style={{fontSize:"16px",color:ACCENT,fontStyle:"italic",fontWeight:"bold"}}>{fmtFull(q.grand)}</div>
-              <div style={{fontSize:"10px",color:MUTE,marginTop:"2px"}}>{q.lines.length} items</div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap"}}>
-            <button onClick={()=>{ if(lines.length>0&&editingQuoteId!==q.id){setShowLoadConfirm(q);}else{loadQuote(q);}}}
-              style={{flex:1,minWidth:"70px",padding:"7px 8px",background:editingQuoteId===q.id?"rgba(255,191,0,0.1)":"rgba(255,107,53,0.1)",border:editingQuoteId===q.id?"1px solid rgba(255,191,0,0.4)":"1px solid rgba(255,107,53,0.4)",borderRadius:"4px",color:editingQuoteId===q.id?GOLD:ACCENT,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.04em"}}>
-              {editingQuoteId===q.id?"✎ EDITING":"✎ EDIT"}
-            </button>
-            <button onClick={()=>{ if(hasContent){setShowForkConfirm(q);}else{forkQuote(q);}}}
-              style={{flex:1,minWidth:"70px",padding:"7px 8px",background:"rgba(126,184,247,0.1)",border:"1px solid rgba(126,184,247,0.4)",borderRadius:"4px",color:CUSTOM_COLOR,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.04em"}}>
-              ⎘ FORK
-            </button>
-            <button onClick={()=>downloadExcel(q)}
-              style={{flex:1,minWidth:"70px",padding:"7px 8px",background:"rgba(46,196,182,0.1)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif",letterSpacing:"0.04em"}}>
-              ⬇ EXCEL
-            </button>
-            <button onClick={()=>deleteQuote(q.id)}
-              style={{padding:"7px 10px",background:"transparent",border:`1px solid ${BORDER2}`,borderRadius:"4px",color:FADE,fontSize:"11px",cursor:"pointer",fontFamily:"Georgia,serif"}}>✕</button>
-          </div>
-        </div>
-      ))}
-
-      {showLoadConfirm&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
-          <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
-            <div style={{fontSize:"14px",color:TEXT,marginBottom:"8px"}}>Load <span style={{color:ACCENT,fontStyle:"italic"}}>{showLoadConfirm.projectName}</span>?</div>
-            <div style={{fontSize:"12px",color:FADE,marginBottom:"20px"}}>Your current unsaved work will be replaced.</div>
-            <div style={{display:"flex",gap:"10px"}}>
-              <button onClick={()=>loadQuote(showLoadConfirm)} style={{flex:1,padding:"10px",background:"rgba(255,107,53,0.2)",border:"1px solid rgba(255,107,53,0.5)",borderRadius:"4px",color:ACCENT,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>Load & Edit</button>
-              <button onClick={()=>setShowLoadConfirm(null)} style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showForkConfirm&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
-          <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"360px",padding:"24px"}}>
-            <div style={{fontSize:"14px",color:TEXT,marginBottom:"8px"}}>Fork <span style={{color:CUSTOM_COLOR,fontStyle:"italic"}}>{showForkConfirm.projectName}</span>?</div>
-            <div style={{fontSize:"12px",color:FADE,marginBottom:"20px"}}>Your current unsaved work will be replaced. The original quote will not be changed.</div>
-            <div style={{display:"flex",gap:"10px"}}>
-              <button onClick={()=>forkQuote(showForkConfirm)} style={{flex:1,padding:"10px",background:"rgba(126,184,247,0.15)",border:"1px solid rgba(126,184,247,0.5)",borderRadius:"4px",color:CUSTOM_COLOR,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>⎘ Fork It</button>
-              <button onClick={()=>setShowForkConfirm(null)} style={{flex:1,padding:"10px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",color:FADE,fontSize:"12px",cursor:"pointer",fontFamily:"Georgia,serif"}}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Save Modal ────────────────────────────────────────────────────────────
-  const saveModal = showSaveModal&&(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
-      <div style={{background:BGCARD,border:`1px solid ${BORDER}`,borderRadius:"10px",width:"100%",maxWidth:"400px",overflow:"hidden"}}>
-        <div style={{padding:"16px 20px",borderBottom:`1px solid ${BORDER}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:"13px",letterSpacing:"0.1em",color:MUTE}}>{editingQuoteId?"UPDATE QUOTE":"SAVE AS NEW QUOTE"}</div>
-          <button onClick={()=>setShowSaveModal(false)} style={{background:"transparent",border:"none",color:FADE,fontSize:"16px",cursor:"pointer"}}>✕</button>
-        </div>
-        <div style={{padding:"20px"}}>
-          {[{label:"Project Name",value:projName,setter:setProjName},{label:"Customer Name",value:saveCustomer,setter:setSaveCustomer},{label:"Prepared By",value:saveUser,setter:setSaveUser}].map(({label,value,setter})=>(
-            <div key={label} style={{marginBottom:"14px"}}>
-              <div style={{fontSize:"10px",letterSpacing:"0.14em",color:MUTE,marginBottom:"5px"}}>{label.toUpperCase()}</div>
-              <input value={value} onChange={e=>setter(e.target.value)}
-                style={{width:"100%",background:BGROW,border:`1px solid ${BORDER}`,borderRadius:"4px",padding:"9px 12px",color:TEXT,fontSize:"13px",fontFamily:"Georgia,serif",outline:"none",boxSizing:"border-box"}} />
-            </div>
-          ))}
-          <div style={{padding:"10px 12px",background:"rgba(255,107,53,0.06)",border:`1px solid ${BORDER}`,borderRadius:"4px",marginBottom:"16px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",color:TEXTDIM}}>
-              <span>Total Estimate</span>
-              <span style={{color:ACCENT,fontStyle:"italic",fontWeight:"bold"}}>{fmtFull(grand)}</span>
-            </div>
-            <div style={{fontSize:"10px",color:FADE,marginTop:"3px"}}>{selCount} line items{softwareBudget>0?" + software":""}{areas.length>0?` · ${areas.length} area${areas.length>1?"s":""}`:""} · {new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"})}</div>
-          </div>
-          <button onClick={doSaveQuote}
-            style={{width:"100%",padding:"12px",background:editingQuoteId?"rgba(255,191,0,0.2)":"rgba(255,107,53,0.2)",border:editingQuoteId?"1px solid rgba(255,191,0,0.6)":"1px solid rgba(255,107,53,0.6)",borderRadius:"5px",color:editingQuoteId?GOLD:ACCENT,fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
+            style={{flex:1,padding:"12px",background:ACCENT,border:"none",borderRadius:"5px",color:"white",fontSize:"13px",letterSpacing:"0.08em",cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold"}}>
             {editingQuoteId?"UPDATE QUOTE":"SAVE AS NEW QUOTE"}
           </button>
         </div>
+        {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"#DCFCE7",border:"1px solid #BBF7D0",borderRadius:"4px",color:"#166534",fontSize:"12px",textAlign:"center"}}>✓ Quote saved successfully</div>}
       </div>
     </div>
   );
 
-  // ── Shell ─────────────────────────────────────────────────────────────────
-  return (
-    <div ref={containerRef} style={{height:"100vh",display:"flex",flexDirection:"column",background:BG,fontFamily:"Georgia,'Times New Roman',serif",color:TEXT,overflow:"hidden"}}>
-      {saveModal}
-     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:"50px",borderBottom:`1px solid ${BORDER}`,background:"#0A2540",color:"white",flexShrink:0,gap:"10px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:"9px",flexShrink:0}}>
-<div style={{width:"20px",height:"20px",background:"linear-gradient(135deg,#00A3E0,#0A2540)",clipPath:"polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)"}} />
-          <span style={{fontSize:mobile?"13px":"15px",letterSpacing:"0.06em",fontWeight:"bold",whiteSpace:"nowrap"}}>
-            RULE OF THUMB <span style={{color:ACCENT,fontStyle:"italic"}}>BUDGET TOOL</span>
-          </span>
-        </div>
-        {!mobile&&(
-          <div style={{display:"flex",alignItems:"center",gap:"6px",flex:1,justifyContent:"center"}}>
-            {nameEditor(false)}<span style={{fontSize:"10px",color:MUTE}}>✎</span>
-          </div>
-        )}
-        <div style={{display:"flex",alignItems:"center",gap:"5px",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:"20px",padding:"4px 10px",flexShrink:0}}>
-          <span style={{fontSize:"10px",color:"#8A8880"}}>TOTAL</span>
-          <span style={{fontSize:"14px",fontStyle:"italic",color:ACCENT,fontWeight:"bold"}}>{fmtFull(grand)}</span>
-        </div>
+  const savedPanel = (
+    <div style={{flex:1,overflowY:"auto",background:BG,minHeight:0}}>
+      <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
+        <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>SAVED QUOTES</div>
       </div>
+      {savedQuotes.length===0?(
+        <div style={{padding:"32px 20px",textAlign:"center",color:FADE,fontSize:"12px"}}>No saved quotes yet</div>
+      ):savedQuotes.map(q=>(
+        <div key={q.id} style={{padding:"14px 16px",borderBottom:`1px solid ${BORDER}`,background:editingQuoteId===q.id?"#F1F5F9":BGROW}}>
+          <div style={{display:"flex",justifyContent:"space-between",gap:"8px"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:"14px",color:TEXT,fontStyle:"italic"}}>{q.projectName}</div>
+              <div style={{fontSize:"11px",color:TEXTDIM}}>{q.customer} · {q.date}</div>
+            </div>
+            <div style={{fontSize:"14px",color:ACCENT,fontWeight:"bold"}}>{fmtFull(q.grand)}</div>
+          </div>
+          <div style={{display:"flex",gap:"6px",marginTop:"10px"}}>
+            <button onClick={()=>loadQuote(q)} style={{flex:1,padding:"6px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",fontSize:"11px",cursor:"pointer"}}>EDIT</button>
+            <button onClick={()=>downloadExcel(q)} style={{flex:1,padding:"6px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",fontSize:"11px",cursor:"pointer"}}>EXCEL</button>
+            <button onClick={()=>deleteQuote(q.id)} style={{padding:"6px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:"4px",fontSize:"11px",cursor:"pointer"}}>✕</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const saveModal = showSaveModal&&(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:"20px"}}>
+      <div style={{background:BG,borderRadius:"10px",width:"100%",maxWidth:"400px",padding:"20px"}}>
+        <div style={{fontSize:"13px",marginBottom:"15px",fontWeight:"bold"}}>SAVE PROJECT</div>
+        {[{label:"Project Name",value:projName,setter:setProjName},{label:"Customer",value:saveCustomer,setter:setSaveCustomer},{label:"User",value:saveUser,setter:setSaveUser}].map(({label,value,setter})=>(
+          <div key={label} style={{marginBottom:"12px"}}>
+            <div style={{fontSize:"10px",color:MUTE,marginBottom:"4px"}}>{label.toUpperCase()}</div>
+            <input value={value} onChange={e=>setter(e.target.value)} style={{width:"100%",padding:"8px",border:`1px solid ${BORDER}`,borderRadius:"4px",outline:"none"}} />
+          </div>
+        ))}
+        <button onClick={doSaveQuote} style={{width:"100%",padding:"12px",background:ACCENT,color:"white",border:"none",borderRadius:"5px",fontWeight:"bold",marginTop:"10px"}}>CONFIRM SAVE</button>
+        <button onClick={()=>setShowSaveModal(false)} style={{width:"100%",padding:"8px",background:"transparent",border:"none",color:FADE,marginTop:"10px"}}>CANCEL</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div ref={containerRef} style={{height:"100vh",display:"flex",flexDirection:"column",background:BG}}>
+      {saveModal}
+      <div style={{height:"50px",background:BGDEEP,color:"white",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px"}}>
+        <span style={{fontSize:"14px",fontWeight:"bold",letterSpacing:"0.05em"}}>RULE OF THUMB <span style={{color:ACCENT}}>BUDGET TOOL</span></span>
+        <div style={{background:"rgba(255,255,255,0.1)",padding:"4px 12px",borderRadius:"20px",fontSize:"14px"}}>{fmtFull(grand)}</div>
+      </div>
+      
       {mobile?(
         <>
-          <div style={{display:"flex",alignItems:"center",gap:"6px",padding:"7px 14px",borderBottom:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0}}>
-            {nameEditor(true)}<span style={{fontSize:"10px",color:FADE}}>✎</span>
-          </div>
-          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             {mobileTab==="catalog"?catalogPanel:mobileTab==="budget"?budgetPanel:savedPanel}
           </div>
-          <div style={{display:"flex",borderTop:`1px solid ${BORDER}`,background:BGDEEP,flexShrink:0}}>
-            {[{key:"catalog",label:"⊕ CATALOG"},{key:"budget",label:`◎ BUDGET${hasContent?` (${selCount})`:""}`},{key:"saved",label:`📋 SAVED${savedQuotes.length>0?` (${savedQuotes.length})`:""}`}].map(tab=>(
+          <div style={{display:"flex",borderTop:`1px solid ${BORDER}`,background:BGDEEP}}>
+            {[{key:"catalog",label:"CATALOG"},{key:"budget",label:"BUDGET"},{key:"saved",label:"SAVED"}].map(tab=>(
               <button key={tab.key} onClick={()=>setMobileTab(tab.key)}
-                style={{flex:1,padding:"13px 4px",background:mobileTab===tab.key?"rgba(255,107,53,0.1)":"transparent",border:"none",borderTop:mobileTab===tab.key?`2px solid ${ACCENT}`:"2px solid transparent",color:mobileTab===tab.key?ACCENT:MUTE,fontSize:"11px",letterSpacing:"0.06em",cursor:"pointer",fontFamily:"Georgia,serif"}}>
+                style={{flex:1,padding:"14px",background:mobileTab===tab.key?ACCENT:"transparent",border:"none",color:"white",fontSize:"11px"}}>
                 {tab.label}
               </button>
             ))}
           </div>
         </>
       ):(
-        <div style={{flex:1,display:"flex",overflow:"hidden",minHeight:0}}>
-          <div style={{width:"380px",flexShrink:0,borderRight:`1px solid ${BORDER}`,display:"flex",flexDirection:"column",overflow:"hidden"}}>{catalogPanel}</div>
-          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",borderRight:`1px solid ${BORDER}`}}>{budgetPanel}</div>
-          <div style={{width:"320px",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>{savedPanel}</div>
+        <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+          <div style={{width:"380px",borderRight:`1px solid ${BORDER}`,display:"flex",flexDirection:"column"}}>{catalogPanel}</div>
+          <div style={{flex:1,display:"flex",flexDirection:"column"}}>{budgetPanel}</div>
+          <div style={{width:"320px",borderLeft:`1px solid ${BORDER}`,display:"flex",flexDirection:"column"}}>{savedPanel}</div>
         </div>
       )}
     </div>
