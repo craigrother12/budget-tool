@@ -758,7 +758,7 @@ function App() {
 
   // ── Budget Panel ──────────────────────────────────────────────────────────
   const budgetPanel = (
-    <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
+    <div style={{flex:1,overflowY:"auto",background:BG,minHeight:0}}>
       <div style={{padding:mobile?"14px 12px":"22px 22px"}}>
 
         {editingQuoteId&&(
@@ -775,7 +775,7 @@ function App() {
 
         <div style={{marginBottom:"16px"}}>
           <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>ROM ESTIMATE</div>
-          <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px",color:"white"}}>{projName}</div>
+          <div style={{fontSize:mobile?"16px":"20px",fontStyle:"italic",marginTop:"4px",color:TEXT}}>{projName}</div>
           <div style={{fontSize:"11px",color:FADE,marginTop:"2px"}}>ROM ±20% estimate</div>
         </div>
 
@@ -1044,7 +1044,7 @@ function App() {
 
   // ── Saved Quotes Panel ────────────────────────────────────────────────────
   const savedPanel = (
-    <div style={{flex:1,overflowY:"auto",background:"#0A0C10",minHeight:0}}>
+    <div style={{flex:1,overflowY:"auto",background:BG,minHeight:0}}>
       <div style={{padding:"12px 16px 8px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{fontSize:"10px",letterSpacing:"0.18em",color:MUTE}}>SAVED QUOTES</div>
         <div style={{fontSize:"12px",color:FADE,marginTop:"3px"}}>{savedQuotes.length} saved</div>
