@@ -219,7 +219,10 @@ const CATALOG = [
 // ── Rate constants ────────────────────────────────────────────────────────────
 const BASE_MARGIN_PCT        = 23;
 const BASE_CONT_PCT          = 3;
-const INTERNAL_MECH_MGN_PCT  = 25;
+const MECH_SPLIT_PCT         = 25;
+const ELEC_SPLIT_PCT         = 25;
+const CONTROLS_SPLIT_PCT     = 35;
+const INTERNAL_PROFIT_PCT    = 25;
 const INTERNAL_SW_MGN_PCT    = 55;
 
 const fmt = (n) => n>=1000000?`$${(n/1000000).toFixed(2)}M`:n>=1000?`$${(n/1000).toFixed(1)}K`:`$${n.toLocaleString()}`;
@@ -459,7 +462,13 @@ function App() {
   }), [lines]);
 
   const equipTotal        = computedLines.reduce((s,l)=>s+l.subtotal,0);
-  const internalMechAmt   = equipTotal * (INTERNAL_MECH_MGN_PCT/100);
+  const mechBase          = equipTotal * (MECH_SPLIT_PCT/100);
+  const elecBase          = equipTotal * (ELEC_SPLIT_PCT/100);
+  const controlsBase      = equipTotal * (CONTROLS_SPLIT_PCT/100);
+  const internalMechProfit     = mechBase * (INTERNAL_PROFIT_PCT/100);
+  const internalElecProfit     = elecBase * (INTERNAL_PROFIT_PCT/100);
+  const internalControlsProfit = controlsBase * (INTERNAL_PROFIT_PCT/100);
+  const internalMechAmt        = internalMechProfit + internalElecProfit + internalControlsProfit;
   const internalSwAmt     = softwareBudget * (INTERNAL_SW_MGN_PCT/100);
   const softwareSell      = softwareBudget > 0 ? softwareBudget * (1 + BASE_CONT_PCT/100) / (1 - BASE_MARGIN_PCT/100) : 0;
   const swContAmt         = softwareBudget > 0 ? softwareBudget * (BASE_CONT_PCT/100) : 0;
@@ -572,13 +581,16 @@ function App() {
     d.push([]);
     d.push(["BUDGET SUMMARY"]);
     d.push(["Mech / Elec / Controls — Turnkey Subtotal", "", "", "", "", "", "", quote.equipTotal]);
-    d.push([`  └ Internal Blended Margin (${INTERNAL_MECH_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalMechAmt||Math.round(quote.equipTotal*0.25)]);
+    d.push([`  └ Internal Profit — Mechanical (${MECH_SPLIT_PCT}% of total × ${INTERNAL_PROFIT_PCT}%)`, "", "", "", "", "", "", Math.round((quote.equipTotal*(MECH_SPLIT_PCT/100))*(INTERNAL_PROFIT_PCT/100))]);
+    d.push([`  └ Internal Profit — Electrical (${ELEC_SPLIT_PCT}% of total × ${INTERNAL_PROFIT_PCT}%)`, "", "", "", "", "", "", Math.round((quote.equipTotal*(ELEC_SPLIT_PCT/100))*(INTERNAL_PROFIT_PCT/100))]);
+    d.push([`  └ Internal Profit — Controls (${CONTROLS_SPLIT_PCT}% of total × ${INTERNAL_PROFIT_PCT}%)`, "", "", "", "", "", "", Math.round((quote.equipTotal*(CONTROLS_SPLIT_PCT/100))*(INTERNAL_PROFIT_PCT/100))]);
+    d.push([`  └ Total Internal Profit (Mech/Elec/Controls — informational)`, "", "", "", "", "", "", quote.internalMechAmt||Math.round(quote.equipTotal*0.2125)]);
     if (quote.softwareBudget>0) {
       d.push(["Software — Cost Basis (entered)", "", "", "", "", "", "", quote.softwareBudget]);
       d.push([`  └ + Contingency (${BASE_CONT_PCT}%)`, "", "", "", "", "", "", swCont]);
       d.push([`  └ + Customer Margin (${BASE_MARGIN_PCT}% on sell)`, "", "", "", "", "", "", swMgn]);
       d.push(["Software — Sell Price (flows into total)", "", "", "", "", "", "", swSell]);
-      d.push([`  └ Internal Blended Margin (${INTERNAL_SW_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalSwAmt||Math.round(quote.softwareBudget*0.55)]);
+      d.push([`  └ Internal Profit (${INTERNAL_SW_MGN_PCT}% — informational)`, "", "", "", "", "", "", quote.internalSwAmt||Math.round(quote.softwareBudget*0.55)]);
       d.push(["Combined Subtotal (Equip + Software Sell Price)", "", "", "", "", "", "", quote.subWithSW]);
     }
     d.push([`Freight & Rigging (${quote.freightPct}%)`, "", "", "", "", "", "", quote.freightAmt]);
@@ -587,7 +599,7 @@ function App() {
     d.push(["TOTAL ROM ESTIMATE", "", "", "", "", "", "", quote.grand]);
     d.push([]);
     d.push([`Catalog prices include ${BASE_MARGIN_PCT}% customer margin + ${BASE_CONT_PCT}% contingency. Software cost is grossed up: cost x 1.0${BASE_CONT_PCT} / (1 - 0.${BASE_MARGIN_PCT}).`]);
-    d.push(["Internal blended margins are informational only — they do not change the totals."]);
+    d.push(["Internal profit figures are informational only — they do not change the totals."]);
     d.push(["DISCLAIMER: ROM estimates +/-20%. For planning purposes only — not a formal quotation."]);
 
     const ws = XLSX.utils.aoa_to_sheet(d);
@@ -670,7 +682,7 @@ function App() {
         <div style={{marginTop:"8px",padding:"8px 10px",background:"rgba(255,191,0,0.06)",border:"1px solid rgba(255,191,0,0.2)",borderRadius:"4px"}}>
           <div style={{fontSize:"10px",color:GOLD,letterSpacing:"0.08em",marginBottom:"2px"}}>⬡ PRICING NOTE</div>
           <div style={{fontSize:"11px",color:TEXTDIM,lineHeight:1.5}}>
-            Catalog prices include an internal blended margin of <span style={{color:GOLD}}>{INTERNAL_MECH_MGN_PCT}%</span> (Mech/Elec/Controls), plus a customer-facing <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin</span> and <span style={{color:GOLD}}>{BASE_CONT_PCT}% contingency</span>. Software carries a <span style={{color:"#9B5DE5"}}>{INTERNAL_SW_MGN_PCT}%</span> internal blended margin. Software cost you enter is grossed up to a sell price using <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin on sell + {BASE_CONT_PCT}% contingency</span>.
+            Catalog prices include internal profit split across <span style={{color:GOLD}}>Mechanical ({MECH_SPLIT_PCT}%)</span>, <span style={{color:GOLD}}>Electrical ({ELEC_SPLIT_PCT}%)</span>, and <span style={{color:GOLD}}>Controls ({CONTROLS_SPLIT_PCT}%)</span> — each × <span style={{color:GOLD}}>{INTERNAL_PROFIT_PCT}% internal profit</span> — plus a customer-facing <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin</span> and <span style={{color:GOLD}}>{BASE_CONT_PCT}% contingency</span>. Software carries a <span style={{color:"#9B5DE5"}}>{INTERNAL_SW_MGN_PCT}%</span> internal profit. Software cost you enter is grossed up to a sell price using <span style={{color:GOLD}}>{BASE_MARGIN_PCT}% margin on sell + {BASE_CONT_PCT}% contingency</span>.
           </div>
         </div>
       </div>
@@ -900,9 +912,24 @@ function App() {
               <span style={{fontSize:"15px",fontStyle:"italic",color:TEXT,flexShrink:0,paddingLeft:"12px"}}>{fmtFull(equipTotal)}</span>
             </div>
             {equipTotal>0&&(
-              <div style={{marginTop:"8px",padding:"7px 10px",background:"rgba(255,191,0,0.04)",border:"1px solid rgba(255,191,0,0.12)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:"11px",color:GOLD}}>⬡ Internal blended margin ({INTERNAL_MECH_MGN_PCT}% Mech/Elec/Controls)</span>
-                <span style={{fontSize:"12px",color:GOLD,fontStyle:"italic"}}>{fmtFull(internalMechAmt)}</span>
+              <div style={{marginTop:"8px",padding:"9px 11px",background:"rgba(255,191,0,0.04)",border:"1px solid rgba(255,191,0,0.12)",borderRadius:"4px",fontSize:"11px",lineHeight:1.9}}>
+                <div style={{fontSize:"10px",letterSpacing:"0.1em",color:GOLD,marginBottom:"4px"}}>⬡ INTERNAL PROFIT (informational)</div>
+                <div style={{display:"flex",justifyContent:"space-between",color:TEXTDIM}}>
+                  <span>Mechanical ({MECH_SPLIT_PCT}% of total × {INTERNAL_PROFIT_PCT}%)</span>
+                  <span style={{color:GOLD,fontStyle:"italic"}}>{fmtFull(internalMechProfit)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",color:TEXTDIM}}>
+                  <span>Electrical ({ELEC_SPLIT_PCT}% of total × {INTERNAL_PROFIT_PCT}%)</span>
+                  <span style={{color:GOLD,fontStyle:"italic"}}>{fmtFull(internalElecProfit)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",color:TEXTDIM}}>
+                  <span>Controls ({CONTROLS_SPLIT_PCT}% of total × {INTERNAL_PROFIT_PCT}%)</span>
+                  <span style={{color:GOLD,fontStyle:"italic"}}>{fmtFull(internalControlsProfit)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",color:GOLD,borderTop:`1px solid rgba(255,191,0,0.2)`,marginTop:"4px",paddingTop:"4px",fontWeight:"bold"}}>
+                  <span>Total Internal Profit</span>
+                  <span style={{fontStyle:"italic"}}>{fmtFull(internalMechAmt)}</span>
+                </div>
               </div>
             )}
           </div>
@@ -944,7 +971,7 @@ function App() {
                   </div>
                 </div>
                 <div style={{marginTop:"6px",padding:"7px 10px",background:"rgba(155,93,229,0.04)",border:"1px solid rgba(155,93,229,0.14)",borderRadius:"4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontSize:"11px",color:"#9B5DE5"}}>⬡ Internal blended margin ({INTERNAL_SW_MGN_PCT}% — informational)</span>
+                  <span style={{fontSize:"11px",color:"#9B5DE5"}}>⬡ Internal Profit ({INTERNAL_SW_MGN_PCT}% — informational)</span>
                   <span style={{fontSize:"12px",color:"#9B5DE5",fontStyle:"italic"}}>{fmtFull(internalSwAmt)}</span>
                 </div>
               </>
@@ -1036,7 +1063,7 @@ function App() {
         {saveSuccess&&<div style={{marginTop:"10px",padding:"10px 14px",background:"rgba(46,196,182,0.12)",border:"1px solid rgba(46,196,182,0.4)",borderRadius:"4px",color:"#2EC4B6",fontSize:"12px",textAlign:"center"}}>✓ {editingQuoteId?"Quote updated":"New quote saved"} successfully</div>}
 
         <div style={{marginTop:"12px",padding:"11px 14px",background:BG,border:`1px dashed ${BORDER}`,borderRadius:"4px",fontSize:"11px",color:FADE,lineHeight:1.6}}>
-          <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are ROM estimates ±20% and include an internal blended margin of {INTERNAL_MECH_MGN_PCT}% (Mech/Elec/Controls) plus a customer-facing {BASE_MARGIN_PCT}% margin and {BASE_CONT_PCT}% contingency. Software cost entered is grossed up to a sell price (formula: cost × 1.0{BASE_CONT_PCT} / (1 − 0.{BASE_MARGIN_PCT})). Software also carries a {INTERNAL_SW_MGN_PCT}% internal blended margin shown for reference only. For planning purposes only — not a formal quotation.
+          <strong style={{color:MUTE}}>DISCLAIMER:</strong> All catalog unit prices are ROM estimates ±20% and include internal profit across Mechanical ({MECH_SPLIT_PCT}%), Electrical ({ELEC_SPLIT_PCT}%), and Controls ({CONTROLS_SPLIT_PCT}%) — each × {INTERNAL_PROFIT_PCT}% internal profit — plus a customer-facing {BASE_MARGIN_PCT}% margin and {BASE_CONT_PCT}% contingency. Software cost entered is grossed up to a sell price (formula: cost × 1.0{BASE_CONT_PCT} / (1 − 0.{BASE_MARGIN_PCT})). Software also carries a {INTERNAL_SW_MGN_PCT}% internal profit shown for reference only. For planning purposes only — not a formal quotation.
         </div>
       </div>
     </div>
